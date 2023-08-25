@@ -5,9 +5,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import top.ffshaozi.BF1ToolPlugin
 import top.ffshaozi.BF1ToolPlugin.Glogger
 import top.ffshaozi.data.*
+import top.ffshaozi.utils.BF1Api.getFullServerDetails
+import top.ffshaozi.utils.BF1Api.searchServerList
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -31,28 +32,11 @@ data class jsonrpcR(
 )
 
 
-/*fun main() {
-    var time = 0
-    repeat(10) {
-        var tun = 0
-        val scope = Thread {
-            while (true) {
-                time += 1
-                tun += 1
-                Thread.sleep(1)
-            }
-        }
-        val id = "LittleArray"
-        scope.start()
-        println(getStats(id))
-        println(getPersonaid(id))
-        println(getWeapon(id))
-        scope.stop()
-        println("$tun")
-    }
-
-    println((time / 10).toString())
-}*/
+/*
+fun main() {
+    println(getFullServerDetails("6f7d8664-42d8-402f-963c-b2ea3c0ee7b9", "8623424970902"))
+}
+*/
 
 object BF1Api {
     private val okHttpClient = OkHttpClient()
@@ -85,7 +69,7 @@ object BF1Api {
             } else {
                 val res = response.body?.string()
                 if (res != null) {
-                    Glogger.info("服管Api请求成功:${res}")
+                    if (res.length>128) Glogger.info("服管Api请求成功:${res.subSequence(0,127)}") else Glogger.info("服管Api请求成功:${res}")
                     PostResponse(isSuccessful = false, reqBody = res)
                 } else {
                     Glogger.warning("服管Api请求失败")
@@ -115,7 +99,7 @@ object BF1Api {
             if (response.isSuccessful) {
                 val res = response.body?.string()
                 if (res != null) {
-                    Glogger.info("数据Api请求成功:${res}")
+                    if (res.length>128) Glogger.info("数据Api请求成功:${res.subSequence(0,127)}") else Glogger.info("数据Api请求成功:${res}")
                     PostResponse(isSuccessful = true, reqBody = res)
                 } else {
                     Glogger.warning("数据Api请求失败")
@@ -137,7 +121,6 @@ object BF1Api {
         }
 
     }
-
     //TODO 数据接口类
     //获取数据
     fun getStats(eaid: String): StatsJson {
@@ -149,7 +132,6 @@ object BF1Api {
             StatsJson(isSuccessful = false)
         }
     }
-
     //获取武器
     fun getWeapon(eaid: String): WeaponsJson {
         val response =
@@ -161,7 +143,6 @@ object BF1Api {
             WeaponsJson(isSuccessful = false)
         }
     }
-
     //获取载具
     fun getVehicles(eaid: String): TankJson {
         val response = getApi("https://api.gametools.network/bf1/vehicles/?name=${eaid}&lang=zh-Tw")
@@ -171,7 +152,6 @@ object BF1Api {
             TankJson(isSuccessful = false)
         }
     }
-
     //获取PID
     fun getPersonaid(eaid: String): PlayerJson {
         val response = getApi("https://api.gametools.network/bf1/player/?name=${eaid}&lang=zh-Tw")
@@ -183,7 +163,6 @@ object BF1Api {
             PlayerJson(isSuccessful = false)
         }
     }
-
     //搜索服务器
     fun searchServer(serverName: String): ServerSearchJson {
         val response =
@@ -195,7 +174,17 @@ object BF1Api {
             ServerSearchJson(isSuccessful = false)
         }
     }
-
+    //服务器列表数据
+    fun searchServerList(gameId: String): ServerListJson {
+        val response =
+            getApi("https://api.gametools.network/bf1/players/?gameid=${gameId}")
+        return if (response.isSuccessful) {
+            //Glogger.info("请求成功转换数据中")
+            Gson().fromJson(response.reqBody, ServerListJson::class.java).copy(isSuccessful = true)
+        } else {
+            ServerListJson(isSuccessful = false)
+        }
+    }
     //TODO 服管接口类
     //获取欢迎信息,用于验证ssid是否有效
     fun getWelcomeMessage(sessionId: String): WelcomeMessage {
@@ -221,13 +210,13 @@ object BF1Api {
         }
     }
     //设置BF1语言
-    fun setAPILocale(sessionId: String): PostResponse {
+    fun setAPILocale(sessionId: String,locale:String = "zh_TW"): PostResponse {
         val method = "CompanionSettings.setLocale"
         val body = Gson().toJson(
             jsonrpc(
                 method = method,
                 params = object {
-                    val locale = "zh_TW"
+                    val locale = locale
                 }
             )
         )
@@ -248,5 +237,84 @@ object BF1Api {
             )
         )
         return postApi(body, sessionId)
+    }
+    //addBan
+    fun addServerBan(sessionId: String, RSPserverId: Int, personaName: String): PostResponse {
+        val method = "RSP.addServerBan"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val serverId = RSPserverId
+                    val personaName = personaName
+                }
+            )
+        )
+        return postApi(body, sessionId)
+    }
+    //removeBan
+    fun removeServerBan(sessionId: String, RSPserverId: Int, personaId: String): PostResponse {
+        val method = "RSP.removeServerBan"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val serverId = RSPserverId
+                    val personaId = personaId
+                }
+            )
+        )
+        return postApi(body, sessionId)
+    }
+    //addVIP
+    fun addServerVIP(sessionId: String, RSPserverId: Int, personaName: String): PostResponse {
+        val method = "RSP.addServerVip"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val serverId = RSPserverId
+                    val personaName = personaName
+                }
+            )
+        )
+        return postApi(body, sessionId)
+    }
+    //removeVIP
+    fun removeServerVIP(sessionId: String, RSPserverId: Int, personaId: String): PostResponse {
+        val method = "RSP.removeServerVip"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val serverId = RSPserverId
+                    val personaId = personaId
+                }
+            )
+        )
+        return postApi(body, sessionId)
+    }
+    //获取服务器完整信息
+    fun getFullServerDetails(sessionId: String, gameId: String): FullServerInfoJson {
+        val method = "GameServer.getFullServerDetails"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val gameId = gameId
+                }
+            )
+        )
+        val postResponse = postApi(body, sessionId)
+        return if (postResponse.isSuccessful){
+            Gson().fromJson(postResponse.reqBody,FullServerInfoJson::class.java).copy(isSuccessful = true)
+        }else{
+            FullServerInfoJson(isSuccessful = false)
+        }
     }
 }
