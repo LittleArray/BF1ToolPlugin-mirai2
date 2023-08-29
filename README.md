@@ -25,4 +25,4 @@
 1. 提交```PR```
 2. 提交Issue
 ### 开源协议
-MIT
+AGPL-3.0 license
