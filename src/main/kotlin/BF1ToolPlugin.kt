@@ -12,15 +12,19 @@ import net.mamoe.mirai.event.subscribeGroupTempMessages
 import net.mamoe.mirai.utils.MiraiLogger
 import net.mamoe.mirai.utils.info
 import top.ffshaozi.command.BF1Cmd
+import top.ffshaozi.config.CustomerLang
 import top.ffshaozi.config.Setting
+import top.ffshaozi.config.Setting.groupData
 import top.ffshaozi.utils.Intent
 import top.ffshaozi.utils.Value.groups
+import org.jsoup.Jsoup.*
+import top.ffshaozi.utils.BF1Api.recentlySearch
 
 object BF1ToolPlugin : KotlinPlugin(
     JvmPluginDescription(
         id = "top.ffshaozi.bf1toolplugin",
         name = "BF1ToolPlugin",
-        version = "0.1.0",
+        version = "1.0.0",
     ) {
         author("FFSHAOZI")
         info("""战地1QQ机器人""")
@@ -34,6 +38,7 @@ object BF1ToolPlugin : KotlinPlugin(
         Glogger = logger
         Glogger.info { "战地一插件已启用,正在加载..." }
         Setting.reload()
+        CustomerLang.reload()
         BF1Cmd.register()
         //登录事件
         globalEventChannel().subscribeOnce<BotOnlineEvent> {
@@ -47,34 +52,32 @@ object BF1ToolPlugin : KotlinPlugin(
                     groups = groups + it.name + "   " + it.id + "\n"
                 }
                 logger.info("获取到的群聊 $groups")
-            }
-            GlobalBots.forEach {
                 Glogger.info("重注册${it.id}群临时会话事件响应 ")
                 it.eventChannel.subscribeGroupTempMessages {
                     startsWith("*") reply { s ->
-                         var temp:Any?=null
-                         Setting.GroupID.forEach {
-                             temp = if (it.key == this.group.id) {
-                                 var isAdmin = false
-                                 this.group.members.forEach {
-                                     if (it.permission.level != 0 && it.id == this.sender.id) isAdmin = true
-                                 }
-                                 if (this.sender.id == 3354889203) {
-                                     isAdmin = true
-                                 }
-                                 Glogger.info("临时消息处理...")
-                                 Intent.runTemp(this, s, isAdmin)
-                             } else {
-                                 Unit
-                             }
-                         }
+                        var temp: Any? = null
+                        groupData.forEach { (it, _) ->
+                            temp = if (it == this.group.id) {
+                                var isAdmin = false
+                                this.group.members.forEach {
+                                    if (it.permission.level != 0 && it.id == this.sender.id) isAdmin = true
+                                }
+                                if (this.sender.id == 3354889203) {
+                                    isAdmin = true
+                                }
+                                Glogger.info("临时消息处理...")
+                                Intent.runTemp(this, s, isAdmin)
+                            } else {
+                                Unit
+                            }
+                        }
                         temp
                     }
                 }
                 Glogger.info("重注册${it.id}群会话事件响应 ")
                 it.eventChannel.subscribeGroupMessages {
-                    Setting.GroupID.forEach {
-                        sentFrom(it.key) and startsWith("*") reply { s ->
+                    groupData.forEach { (it, _) ->
+                        sentFrom(it) and startsWith("*") reply { s ->
                             var isAdmin = false
                             this.group.members.forEach {
                                 if (it.permission.level != 0 && it.id == this.sender.id) isAdmin = true

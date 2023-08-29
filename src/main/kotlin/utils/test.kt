@@ -1,14 +1,31 @@
 package top.ffshaozi.utils
 
-import java.time.Instant
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+import org.jsoup.select.Collector.collect
+import org.jsoup.select.Elements
+import top.ffshaozi.data.RecentlyJson
+import top.ffshaozi.utils.BF1Api.getDateByStringBIH
 
 /**
  * @Description
  * @Author littleArray
- * @Date 2023/8/25
+ * @Date 2023/8/28
  */
 fun main() {
-    println((Instant.now().epochSecond - 1692921592359255/1000000)/60)
-    1692927621
-    1692921592359255
+    val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/Jerrydonleo/matches",false)
+    if (!reqBody.isSuccessful) return
+    //println(reqBody)
+    //document.getElementsByTagName("title")[0].innerHTML
+    val document = Jsoup.parse(reqBody.reqBody)
+    val elements = document.html(reqBody.reqBody).getElementsByClass("details")
+    val ltemp = hashMapOf<String,String>()
+    elements.forEach {
+        for(i in 0.. it.childrenSize()){
+            it.childNode(i).childNodes().forEach {
+                
+            }
+        }
+
+    }
 }

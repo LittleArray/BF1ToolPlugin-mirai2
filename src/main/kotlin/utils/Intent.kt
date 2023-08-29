@@ -3,18 +3,40 @@ package top.ffshaozi.utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
-import net.mamoe.mirai.message.data.*
-import top.ffshaozi.BF1ToolPlugin.Glogger
+import net.mamoe.mirai.message.data.Message
+import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.buildForwardMessage
+import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.BF1ToolPlugin.logger
-import top.ffshaozi.config.Setting.GroupID
-import top.ffshaozi.config.Setting.ServerNameData
-import top.ffshaozi.config.Setting.bindingData
+import top.ffshaozi.config.CustomerLang.addVIPErr
+import top.ffshaozi.config.CustomerLang.addVIPSucc
+import top.ffshaozi.config.CustomerLang.banErr
+import top.ffshaozi.config.CustomerLang.banSucc
+import top.ffshaozi.config.CustomerLang.bindingSucc
+import top.ffshaozi.config.CustomerLang.errCommand
+import top.ffshaozi.config.CustomerLang.kickErr
+import top.ffshaozi.config.CustomerLang.kickSucc
+import top.ffshaozi.config.CustomerLang.notAdminErr
+import top.ffshaozi.config.CustomerLang.nullEac
+import top.ffshaozi.config.CustomerLang.nullServerErr
+import top.ffshaozi.config.CustomerLang.parameterErr
+import top.ffshaozi.config.CustomerLang.searchErr
+import top.ffshaozi.config.CustomerLang.searching
+import top.ffshaozi.config.CustomerLang.searchingSer
+import top.ffshaozi.config.CustomerLang.serverInfoRErr
+import top.ffshaozi.config.CustomerLang.serverInfoRefreshing
+import top.ffshaozi.config.CustomerLang.unBanErr
+import top.ffshaozi.config.CustomerLang.unBanSucc
+import top.ffshaozi.config.CustomerLang.unVIPErr
+import top.ffshaozi.config.CustomerLang.unVIPSucc
+import top.ffshaozi.config.CustomerLang.unbindingErr
+import top.ffshaozi.config.CustomerLang.unbindingSucc
+import top.ffshaozi.config.ServerInfoForSave
+import top.ffshaozi.config.Setting.groupData
 import top.ffshaozi.data.FullServerInfoJson
-import top.ffshaozi.data.ServerListJson
-import top.ffshaozi.data.ServerSearchJson
-import top.ffshaozi.utils.BF1Api.RSPKickPlayer
 import top.ffshaozi.utils.BF1Api.addServerBan
 import top.ffshaozi.utils.BF1Api.addServerVIP
 import top.ffshaozi.utils.BF1Api.getFullServerDetails
@@ -22,15 +44,29 @@ import top.ffshaozi.utils.BF1Api.getPersonaid
 import top.ffshaozi.utils.BF1Api.getStats
 import top.ffshaozi.utils.BF1Api.getWeapon
 import top.ffshaozi.utils.BF1Api.getWelcomeMessage
+import top.ffshaozi.utils.BF1Api.kickPlayer
+import top.ffshaozi.utils.BF1Api.recentlySearch
+import top.ffshaozi.utils.BF1Api.recentlyServerSearch
 import top.ffshaozi.utils.BF1Api.removeServerBan
 import top.ffshaozi.utils.BF1Api.removeServerVIP
+import top.ffshaozi.utils.BF1Api.seaechBFEAC
 import top.ffshaozi.utils.BF1Api.searchServerList
 import top.ffshaozi.utils.BF1Api.setAPILocale
+import top.ffshaozi.utils.CycleTask.serverPlayerListRefresh
+import top.ffshaozi.utils.CycleTask.vipRefresh
+import top.ffshaozi.utils.SettingController.addBinding
+import top.ffshaozi.utils.SettingController.addVip
+import top.ffshaozi.utils.SettingController.getBinding
+import top.ffshaozi.utils.SettingController.isNullServer
+import top.ffshaozi.utils.SettingController.refreshServerInfo
+import top.ffshaozi.utils.SettingController.removeBinding
+import top.ffshaozi.utils.SettingController.removeVip
 import top.ffshaozi.utils.Value.helpText
 import top.ffshaozi.utils.Value.helpTextAdmin
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.util.*
-import kotlin.collections.HashMap
+
 
 data class PullIntent(
     val event: GroupMessageEvent,
@@ -72,7 +108,7 @@ object Intent {
         return if (result is Message) {
             result as Message
         } else {
-            PlainText("未知命令")
+            PlainText(errCommand.replace("//err//", msg))
         }
     }
 
@@ -88,29 +124,31 @@ object Intent {
         val vp = listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*武器")
         var result: Message? = null
         val cmdList = hashMapOf(
+            listOf("*vips") to { vipRefresh(pullIntent) },
+            listOf("*sls") to { serverPlayerListRefresh(pullIntent) },
             listOf("*help", "*帮助", "*?") to { help(pullIntent) },
             listOf("*bd", "*绑定") to { bindingUser(pullIntent) },
             listOf("*ss", "*f") to { searchServer(pullIntent) },
-            listOf("*c", "*查询") to { searchMe(pullIntent) },
+            listOf("*ssi", "*cxlb") to { searchServerListPlayer(pullIntent) },
+            listOf("*c", "*查询","*战绩") to { searchMe(pullIntent) },
             listOf("*vp", "*载具") to { searchVehicle(pullIntent) },
             listOf("*wp", "*武器") to { searchWp(pullIntent) },
+            listOf("*rec", "*最近") to { searchRecently(pullIntent) },
             listOf("*pl", "*玩家列表") to { searchServerList(pullIntent) },
             listOf("*bds", "*绑服") to { bindingServer(pullIntent) },
-            listOf("*sn", "*默认服务器") to { bindingServerName(pullIntent) },
-            listOf("*k", "*kick","*踢人") to { kickPlayer(pullIntent) },
+            listOf("*k", "*kick", "*踢人") to { kickPlayer(pullIntent) },
             listOf("*b", "*ban") to { banPlayer(pullIntent) },
+            listOf("*eac", "*eacban") to { searchEACBan(pullIntent) },
             listOf("*rb", "*removeban") to { unBanPlayer(pullIntent) },
             listOf("*av", "*addvip") to { addVipPlayer(pullIntent) },
             listOf("*rv", "*removevip") to { unVipPlayer(pullIntent) },
-            listOf("*gv", "*getvip","*查v") to { getVipList(pullIntent) },
-            listOf("*gb", "*getban","*查ban") to { getBanList(pullIntent) },
+            listOf("*gv", "*getvip", "*查v") to { getVipList(pullIntent) },
+            listOf("*gb", "*getban", "*查ban") to { getBanList(pullIntent) },
             vp to { vpType: String? -> searchWp(pullIntent, vpType) },
         )
         cmdList.forEach { v ->
             v.key.forEach {
                 if (it == sp[0].lowercase(Locale.getDefault())) {
-                    logger.warning(it.toString())
-                    logger.warning(sp.toString())
                     result = v.value(it)
                 }
             }
@@ -118,7 +156,7 @@ object Intent {
         return if (result is Message) {
             result as Message
         } else {
-            PlainText("未知命令")
+            PlainText(errCommand.replace("//err//", msg))
         }
     }
 
@@ -135,25 +173,26 @@ object Intent {
     //TODO 绑定实现
     private fun bindingUser(I: PullIntent): Message {
         return if (I.cmdSize > 1) {//绑定操作
-            bindingData.put(I.event.sender.id, I.sp[1])
-            PlainText("绑定成功")
+            addBinding(I.event.group.id, I.event.sender.id, I.sp[1])
+            PlainText(bindingSucc.replace("//id//", I.sp[1]))
         } else {
             //解绑操作
-            val temp = bindingData.remove(I.event.sender.id)
+            val temp = removeBinding(I.event.group.id, I.event.sender.id)
             if (temp != null) {
-                PlainText("解绑成功")
+                PlainText(unbindingSucc.replace("//id//", I.event.sender.nameCardOrNick))
             } else {
-                PlainText("未绑定,请先绑定EAID")
+                PlainText(unbindingErr)
             }
         }
     }
 
     //TODO 查询自己实现
     private fun searchMe(I: PullIntent): Message {
-        val id = getEAID(I)
-        if (id.isEmpty()) return PlainText("未绑定EAID")
+        var id = getBinding(I.event.group.id, I.event.sender.id)
+        if (I.cmdSize > 1) id = I.sp[1]
+        if (id.isEmpty()) return PlainText(unbindingErr)
         //查询
-        sendMsg(I, "查询${id}的基础数据中...")
+        sendMsg(I, searching.replace("//id//", id).replace("//action//", "基础数据"))
         val tempStatsJson = getStats(id)
         return if (tempStatsJson.isSuccessful) {
             PlainText(
@@ -163,18 +202,72 @@ object Intent {
                             KPM:${tempStatsJson.killsPerMinute} SPM:${tempStatsJson.scorePerMinute} 
                             LifeKD:${tempStatsJson.killDeath} 胜率:${tempStatsJson.winPercent}
                             死亡:${tempStatsJson.deaths} 击杀:${tempStatsJson.kills}
+                            扎人数:${tempStatsJson.revives} 治疗数:${tempStatsJson.heals}
+                            修理数:${tempStatsJson.repairs}  狗牌数:${tempStatsJson.dogtagsTaken}
+                            复仇数:${tempStatsJson.avengerKills} 协助击杀:${tempStatsJson.killAssists}
                             命中率:${tempStatsJson.accuracy} 爆头率:${tempStatsJson.headshots}
+                            技巧值:${tempStatsJson.skill}
+                            最远击杀距离:${tempStatsJson.longestHeadShot}m
                             游玩时长:${tempStatsJson.secondsPlayed.toInt() / 60 / 60}h
-                            最佳兵种:${tempStatsJson.bestClass} 
-                            
+                            最佳兵种:${tempStatsJson.bestClass}
                         """.trimIndent()
             )
 
         } else {
-            PlainText("基础数据查询失败")
+            PlainText(searchErr.replace("//action//", "基础数据"))
         }
     }
 
+    //TODO 查询BFEAC的实现
+    private fun searchEACBan(I: PullIntent): Message {
+        var id = getBinding(I.event.group.id, I.event.sender.id)
+        if (I.cmdSize > 1) id = I.sp[1]
+        if (id.isEmpty()) return PlainText(unbindingErr)
+        //查询
+        sendMsg(I, searching.replace("//id//", id).replace("//action//", "EACBan数据"))
+        val eacInfoJson = seaechBFEAC(id)
+        if (eacInfoJson.error_code != 0) return PlainText(nullEac.replace("//id//", id))
+        if (eacInfoJson.data.isNullOrEmpty()) return PlainText(nullEac.replace("//id//", id))
+        return when (eacInfoJson.data[0].current_status) {
+            0 ->  PlainText("ID:${eacInfoJson.data[0].current_name}有记录但未处理\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            1 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为石锤\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            2 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为证据不足\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            3 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证通过\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            4 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证中\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            5 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为刷枪\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            else -> PlainText("ID:${eacInfoJson.data[0].current_name}未知判定\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+        }
+    }
+    //TODO 最近实现
+    private fun searchRecently(I: PullIntent): Message {
+        var id = getBinding(I.event.group.id, I.event.sender.id)
+        if (I.cmdSize > 1) id = I.sp[1]
+        if (id.isEmpty()) return PlainText(unbindingErr)
+        //查询
+        sendMsg(I, searching.replace("//id//", id).replace("//action//", "最近数据"))
+        val recentlyJson = recentlySearch(id)
+        val hashMap = recentlyServerSearch(id)
+        var temp = "${id}的最近数据\n"
+        recentlyJson.forEachIndexed() {index,it->
+            if (index + 1 > 3) return@forEachIndexed
+            if (!it.isSuccessful) return PlainText(searchErr.replace("//action//", "最近数据"))
+            temp +="""
+            统计时间:${it.rp}
+            游玩时间:${it.tp}
+            最近SPM:${it.spm}
+            最近KPM:${it.kpm}
+            最近KD:${it.kd}
+            """.trimIndent()+"\n=============\n"
+        }
+        temp +="最近游玩服务器:\n"
+        hashMap.forEach { (map, name) ->
+            temp +="""
+            服务器:${name}
+            地图:${map}
+            """.trimIndent()+"\n=============\n"
+        }
+        return temp.toPlainText()
+    }
     //TODO 查询武器实现
     private fun searchWp(I: PullIntent, type: String? = null): Message {
         val typeI = when (type) {
@@ -191,10 +284,11 @@ object Intent {
             "*制式步枪" -> "制式步槍"
             else -> null
         }
-        val id = getEAID(I)
-        if (id.isEmpty()) return PlainText("未绑定EAID")
+        var id = getBinding(I.event.group.id, I.event.sender.id)
+        if (I.cmdSize > 1) id = I.sp[1]
+        if (id.isEmpty()) return PlainText(unbindingErr)
         //查询
-        sendMsg(I, "查询${id}的武器数据中...")
+        sendMsg(I, searching.replace("//id//", id).replace("//action//", "武器数据"))
         val tempWeaponsJson = getWeapon(id)
         val message = I.event.buildForwardMessage {
             add(I.event.bot.id, I.event.bot.nick, PlainText("回复:${id}"))
@@ -212,7 +306,9 @@ object Intent {
                             武器名:${it.weaponName} 
                             武器击杀数:${it.kills}
                             爆头率:${it.headshots}
+                            爆头击杀:${it.headshotKills}
                             命中率:${it.accuracy}
+                            配备时长:${it.timeEquipped/60/60}h
                             枪械类型:${it.type}
                                             """.trimIndent()
                                     )
@@ -239,7 +335,7 @@ object Intent {
                     }
                 }
             } else {
-                add(I.event.bot.id, I.event.bot.nick, PlainText("武器数据查询失败"))
+                add(I.event.bot.id, I.event.bot.nick, PlainText(searchErr.replace("//action//", "武器数据")))
             }
         }
         return message
@@ -247,10 +343,11 @@ object Intent {
 
     //TODO 查询载具实现
     private fun searchVehicle(I: PullIntent): Message {
-        val id = getEAID(I)
-        if (id.isEmpty()) return PlainText("未绑定EAID")
+        var id = getBinding(I.event.group.id, I.event.sender.id)
+        if (I.cmdSize > 1) id = I.sp[1]
+        if (id.isEmpty()) return PlainText(unbindingErr)
         //查询
-        sendMsg(I, "查询${id}的载具数据中...")
+        sendMsg(I, searching.replace("//id//", id).replace("//action//", "载具数据"))
         val tankJson = BF1Api.getVehicles(id)
         val message = I.event.buildForwardMessage {
             add(I.event.bot.id, I.event.bot.nick, PlainText("回复:${id}"))
@@ -268,7 +365,7 @@ object Intent {
                     )
                 }
             } else {
-                add(I.event.bot.id, I.event.bot.nick, "查询失败,请重试".toPlainText())
+                add(I.event.bot.id, I.event.bot.nick, searchErr.replace("//action//", "载具数据").toPlainText())
             }
         }
         return message
@@ -277,7 +374,7 @@ object Intent {
     //TODO 查询服务器实现
     private fun searchServer(I: PullIntent): Message {
         return if (I.cmdSize > 1) {
-            sendMsg(I, "查询${I.sp[1]}中")
+            sendMsg(I, searchingSer.replace("//ser//", I.sp[1]))
             val serverSearchJson = BF1Api.searchServer(I.sp[1])
             return if (serverSearchJson.isSuccessful) {
                 var temp = ""
@@ -297,56 +394,33 @@ object Intent {
                 }
                 temp.toPlainText()
             } else {
-                "查询失败喵~".toPlainText()
+                searchErr.replace("//action//", "服务器").toPlainText()
             }
         } else {
-            "请输入服务器名称".toPlainText()
+            parameterErr.replace("//para//", "*ss <ServerName>").toPlainText()
         }
     }
 
-    //TODO 查询服务器列表的实现
-    private fun searchServerList(I: PullIntent): Message {
-        var serverName = ""
-        ServerNameData.forEach { (t, u) ->
-            if (t == I.event.group.id) {
-                serverName = u
-            }
-        }
-        if (I.cmdSize > 1) serverName = I.sp[1]
-        if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-        //sendMsg(I, "生成中...")
-        val serverID = BF1Api.searchServer(serverName)
-        if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
-        val exc: HashMap<String, String> = if (I.cmdSize > 1) {
-            val temp: HashMap<String, String> = hashMapOf()
-            serverID.servers?.forEach {
-                it.gameId?.let { it1 -> temp.put(it1, "") }
-            }
-            temp
-        } else {
-            getGameIDList(I.event.group.id, serverID)
-        }
-        Glogger.warning(exc.toString())
-        val serverListJson: MutableList<ServerListJson> = mutableListOf()
-        exc.forEach { (t, u) ->
-            Glogger.warning(t)
-            Glogger.warning(u)
-            serverListJson.add(searchServerList(t))
-        }
-        serverListJson.forEach {
-            val msg = I.event.buildForwardMessage {
-                if (it.isSuccessful == true) {
-                    add(
-                        I.event.bot.id, I.event.bot.nick, PlainText(
-                            """  
-                               服务器:${it.serverinfo?.name}
-                    """.trimIndent()
-                        )
-                    )
-                    val teams = I.event.buildForwardMessage {
+    //TODO 查询服务器玩家列表的实现
+    private fun searchServerList(I: PullIntent, re: Boolean = false): Message {
+        if (I.cmdSize < 2) return parameterErr.replace("//para//", "*pl <ServerCount>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.replace("//err//", "").toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.gameID.isNullOrEmpty()) {
+                    if (re) return serverInfoRErr.toPlainText()
+                    searchServerList(I, re = true)
+                    return serverInfoRefreshing.toPlainText()
+                }
+                val serverListJson = searchServerList(it.gameID!!)
+                val msg = I.event.buildForwardMessage {
+                    if (serverListJson.isSuccessful == true) {
+                        var player = 0
                         val team1 = I.event.buildForwardMessage {
                             add(I.event.bot.id, "teamOne", "队伍1".toPlainText())
-                            it.teams?.forEach {
+                            serverListJson.teams?.forEach {
                                 if (it.teamid == "teamOne") {
                                     it.players.forEach {
                                         add(
@@ -358,13 +432,14 @@ object Intent {
                                                 """.trimIndent()
                                             )
                                         )
+                                        player += 1
                                     }
                                 }
                             }
                         }
                         val team2 = I.event.buildForwardMessage {
                             add(I.event.bot.id, "teamOne", "队伍2".toPlainText())
-                            it.teams?.forEach {
+                            serverListJson.teams?.forEach {
                                 if (it.teamid == "teamTwo") {
                                     it.players.forEach {
                                         add(
@@ -372,206 +447,254 @@ object Intent {
                                                 """
                                                     ID:${it.name} Lv.${it.rank}
                                                     Ping:${it.latency} 
-                                                    游玩时长:${(Instant.now().epochSecond - it.join_time / 1000000)  / 60}mins
+                                                    游玩时长:${(Instant.now().epochSecond - it.join_time / 1000000) / 60}mins
                                                 """.trimIndent()
                                             )
                                         )
+                                        player += 1
                                     }
-
                                 }
                             }
                         }
-                        add(I.event.bot.id, "teamOne", team1)
-                        add(I.event.bot.id, "teamTwo", team2)
+                        add(
+                            I.event.bot.id, I.event.bot.nick, PlainText(
+                                """  
+                               服务器:${serverListJson.serverinfo?.name}
+                               地图:${serverListJson.serverinfo?.level}
+                               在线人数:${player}/64
+                                """.trimIndent()
+                            )
+                        )
+                        add(I.event.bot.id, "队伍1", team1)
+                        add(I.event.bot.id, "队伍2", team2)
+                    } else {
+                        add(I.event.bot.id, "Error", PlainText("查询失败"))
                     }
-                    add(I.event.bot.id, "Teams", teams)
-                } else {
-                    add(I.event.bot.id, "Error", PlainText("查询失败"))
                 }
-            }
-            CoroutineScope(Dispatchers.IO).launch{
-                I.event.subject.sendMessage(msg)
+                return msg
             }
         }
-        return "查询完毕".toPlainText()
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
+    }
+    //TODO 搜索服务器玩家
+    private fun searchServerListPlayer(I: PullIntent, re: Boolean = false): Message {
+        if (I.cmdSize < 3) return parameterErr.replace("//para//", "*ssi <ServerCount> <ID>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.replace("//err//", "").toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.gameID.isNullOrEmpty()) {
+                    if (re) return serverInfoRErr.toPlainText()
+                    searchServerList(I, re = true)
+                    return serverInfoRefreshing.toPlainText()
+                }
+                val serverListJson = searchServerList(it.gameID!!)
+                return if (serverListJson.isSuccessful == true) {
+                    var p = "在服务器${serverCount}中查找到\n"
+                    serverListJson.teams?.forEach {team ->
+                        team.players.forEach {
+                            if (it.name.indexOf(I.sp[2],0,true) != -1){
+                                p += "ID:${it.name} 所在队伍:${team.name}\n"
+                            }
+                        }
+                    }
+                    p.toPlainText()
+                }else{
+                    searchErr.replace("//action//","服务器玩家").toPlainText()
+                }
+            }
+        }
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
+    }
+    //TODO 踢人实现
+    private fun kickPlayer(I: PullIntent, re: Boolean = false): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (I.cmdSize < 3) return parameterErr.replace("//para//", "*k <ID> <Reason>").toPlainText()
+        if (isNullServer(I.event.group.id)) return "不存在绑定的服务器".toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val pid = getPersonaid(I.sp[1])
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (it.gameID.isNullOrEmpty() || it.sessionId.isNullOrEmpty()) {
+                if (re) serverInfoRErr.toPlainText()
+                kickPlayer(I, true)
+                return serverInfoRefreshing.toPlainText()
+            }
+            val kickR = when(I.sp[2]){
+                "*tj" -> "禁止偷家"
+                "*zz" -> "禁止蜘蛛人"
+                "*ur" -> "違反規則"
+                "*nf" -> "nuan 服战神是吧"
+                else -> I.sp[2]
+            }
+            val kickPlayer = kickPlayer(it.sessionId!!, it.gameID!!, pid.id.toString(),kickR)
+            if (kickPlayer.isSuccessful) {
+                sendMsg(I, kickSucc.replace("//id//", I.sp[1]).replace("//serverCount//", "${index+1}").replace("//res//",kickR))
+            } else {
+                refreshServerInfo(I.event.group.id)
+                sendMsg(I, kickErr.replace("//id//", I.sp[1]).replace("//err//", kickPlayer.reqBody))
+            }
+        }
+        return "Ok".toPlainText()
     }
 
-    //TODO 踢人实现
-    private fun kickPlayer(I: PullIntent): Message {
-        if (I.isAdmin) {
-            if (I.cmdSize > 2) {
-                var serverName = ""
-                ServerNameData.forEach { (t, u) ->
-                    if (t == I.event.group.id) {
-                        serverName = u
-                    }
-                }
-                if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-                //sendMsg(I,"查找此人PID")
-                val pid = getPersonaid(I.sp[1])
-                if (!pid.isSuccessful) return "查找PID失败,踢人失败".toPlainText()
-                //sendMsg(I,"查找该服务器")
-                val serverID = BF1Api.searchServer(serverName)
-                if (!serverID.isSuccessful) return "查找服务器失败,踢人失败".toPlainText()
-                val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-                exc.forEach { (t, u) ->
-                    RSPKickPlayer(u, t, pid.id.toString(), I.sp[2])
-                }
-                return "踢完了".toPlainText()
-            } else {
-                return "参数不足".toPlainText()
-            }
-        } else {
-            return "非管理员".toPlainText()
-        }
-    }
     //TODO ban人实现
-    private fun banPlayer(I: PullIntent): Message {
-        if (I.isAdmin) {
-            if (I.cmdSize > 1) {
-                var serverName = ""
-                ServerNameData.forEach { (t, u) ->
-                    if (t == I.event.group.id) {
-                        serverName = u
-                    }
+    private fun banPlayer(I: PullIntent, re: Boolean = false): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (I.cmdSize < 3) return parameterErr.replace("//para//", "*b <ServerCount> <ID>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.replace("//err//", "").toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.serverRspID == 0 || it.sessionId.isNullOrEmpty()) {
+                    if (re) serverInfoRErr.toPlainText()
+                    banPlayer(I, true)
+                    return serverInfoRefreshing.toPlainText()
                 }
-                if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-                //sendMsg(I,"查找该服务器")
-                val serverID = BF1Api.searchServer(serverName)
-                if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
-                val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-                exc.forEach { (t, u) ->
-                    val serverDetails = getFullServerDetails(u, t)
-                    serverDetails.result?.rspInfo?.server?.serverId?.let { addServerBan(u, it.toInt(), I.sp[1]) }
+                val serverBan = addServerBan(it.sessionId!!, it.serverRspID, I.sp[2])
+                if (serverBan.isSuccessful) {
+                    return banSucc.replace("//id//", I.sp[1]).replace("//serverCount//", "$serverCount").toPlainText()
+                } else {
+                    refreshServerInfo(I.event.group.id)
+                    return banErr.replace("//id//", I.sp[1]).replace("//err//", serverBan.reqBody).toPlainText()
                 }
-                return "Ban完了".toPlainText()
-            } else {
-                return "参数不足".toPlainText()
             }
-        } else {
-            return "非管理员".toPlainText()
         }
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
+
     //TODO unban人实现
-    private fun unBanPlayer(I: PullIntent): Message {
-        if (I.isAdmin) {
-            if (I.cmdSize > 1) {
-                var serverName = ""
-                ServerNameData.forEach { (t, u) ->
-                    if (t == I.event.group.id) {
-                        serverName = u
-                    }
+    private fun unBanPlayer(I: PullIntent, re: Boolean = false): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (I.cmdSize < 3) return parameterErr.replace("//para//", "*rb <ServerCount> <ID>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        val pid = getPersonaid(I.sp[2])
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.serverRspID == 0 || it.sessionId.isNullOrEmpty()) {
+                    if (re) serverInfoRErr.toPlainText()
+                    unBanPlayer(I, true)
+                    return serverInfoRefreshing.toPlainText()
                 }
-                //sendMsg(I,"查找此人PID")
-                val pid = getPersonaid(I.sp[1])
-                if (!pid.isSuccessful) return "查找PID失败".toPlainText()
-                if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-                //sendMsg(I,"查找该服务器")
-                val serverID = BF1Api.searchServer(serverName)
-                if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
-                val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-                exc.forEach { (t, u) ->
-                    val serverDetails = getFullServerDetails(u, t)
-                    serverDetails.result?.rspInfo?.server?.serverId?.let { removeServerBan(u, it.toInt(), pid.id.toString()) }
+                val serverBan = removeServerBan(it.sessionId!!, it.serverRspID, pid.id.toString())
+                return if (serverBan.isSuccessful) {
+                    unBanSucc.replace("//serverCount//", "$serverCount").replace("//id//", I.sp[2]).toPlainText()
+                } else {
+                    refreshServerInfo(I.event.group.id)
+                    unBanErr.replace("//id//", I.sp[2]).replace("//err//", serverBan.reqBody).toPlainText()
                 }
-                return "移除Ban完了".toPlainText()
-            } else {
-                return "参数不足".toPlainText()
             }
-        } else {
-            return "非管理员".toPlainText()
         }
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
-    //TODO 查询Ban实现
-    private fun getBanList(I: PullIntent):Message{
-        var serverName = ""
-        ServerNameData.forEach { (t, u) ->
-            if (t == I.event.group.id) {
-                serverName = u
-            }
-        }
-        if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-        val serverID = BF1Api.searchServer(serverName)
-        if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
-        val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-        val fullServerInfoJson:MutableList<FullServerInfoJson> = mutableListOf()
-        exc.forEach { (t, u) ->
-            fullServerInfoJson.add(getFullServerDetails(u,t))
-        }
-        fullServerInfoJson.forEach {
-            if (it.isSuccessful == true){
-                var banStr=""
-                it.result?.rspInfo?.bannedList?.forEach {
-                    banStr += "ID:${it.displayName}\n"
+
+    //TODO 查询服务器Ban实现
+    private fun getBanList(I: PullIntent, re: Boolean = false): Message {
+        if (I.cmdSize < 2) return parameterErr.replace("//para//", "*gb <ServerCount>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.gameID.isNullOrEmpty()) {
+                    if (re) return serverInfoRErr.toPlainText()
+                    getBanList(I, re = true)
+                    return serverInfoRefreshing.toPlainText()
                 }
-                sendMsg(I, "服务器Ban:\n$banStr")
-            }else{
-                return "查询失败".toPlainText()
+                val it: FullServerInfoJson = getFullServerDetails(it.sessionId.toString(), it.gameID.toString())
+                return if (it.isSuccessful == true) {
+                    var banStr = ""
+                    it.result?.rspInfo?.bannedList?.sortedBy { bannedList -> bannedList.displayName }?.forEach {
+                        banStr += "ID:${it.displayName}\n"
+                    }
+                    "服务器${serverCount}的Ban:\n$banStr".toPlainText()
+                } else {
+                    refreshServerInfo(I.event.group.id)
+                    searchErr.replace("//action//", "封禁列表").toPlainText()
+                }
             }
         }
-        return "查询完成".toPlainText()
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
 
     //TODO 添加VIP实现
-    private fun addVipPlayer(I: PullIntent): Message {
-        if (I.isAdmin) {
-            if (I.cmdSize > 1) {
-                var serverName = ""
-                ServerNameData.forEach { (t, u) ->
-                    if (t == I.event.group.id) {
-                        serverName = u
+    private fun addVipPlayer(I: PullIntent, re: Boolean = false): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (I.cmdSize < 2) return parameterErr.replace("//para//", "*av <ServerCount> <ID> <Time>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.gameID.isNullOrEmpty() || it.serverRspID == 0) {
+                    if (re) return serverInfoRErr.toPlainText()
+                    addVipPlayer(I, re = true)
+                    return serverInfoRefreshing.toPlainText()
+                }
+                val serverVIP = addServerVIP(it.sessionId.toString(), it.serverRspID, I.sp[2])
+                if (serverVIP.isSuccessful) {
+                    if (I.cmdSize > 2) {
+                        addVip(I.event.group.id, serverCount, I.sp[2], I.sp[3])
+                        return addVIPSucc
+                            .replace("//id//", I.sp[2])
+                            .replace("//serverCount//", "$serverCount")
+                            .replace("//Time//", "${I.sp[3]}天的")
+                            .toPlainText()
                     }
+                    return addVIPSucc
+                        .replace("//id//", I.sp[2])
+                        .replace("//serverCount//", "$serverCount")
+                        .replace("//Time//", "")
+                        .toPlainText()
+                } else {
+                    refreshServerInfo(I.event.group.id)
+                    return addVIPErr.replace("//id//", I.sp[2]).replace("//err//", serverVIP.reqBody).toPlainText()
                 }
-                if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-                //sendMsg(I,"查找该服务器")
-                val serverID = BF1Api.searchServer(serverName)
-                if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
-                val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-                exc.forEach { (t, u) ->
-                    val serverDetails = getFullServerDetails(u, t)
-                    serverDetails.result?.rspInfo?.server?.serverId?.let { addServerVIP(u, it.toInt(), I.sp[1]) }
-                }
-                return "加Vip完了".toPlainText()
-            } else {
-                return "参数不足".toPlainText()
             }
-        } else {
-            return "非管理员".toPlainText()
         }
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
+
     //TODO 移除VIP人实现
-    private fun unVipPlayer(I: PullIntent): Message {
-        if (I.isAdmin) {
-            if (I.cmdSize > 1) {
-                var serverName = ""
-                ServerNameData.forEach { (t, u) ->
-                    if (t == I.event.group.id) {
-                        serverName = u
-                    }
+    private fun unVipPlayer(I: PullIntent, re: Boolean = false): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (I.cmdSize < 2) return parameterErr.replace("//para//", "*rv <ServerCount> <ID>").toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.toPlainText()
+        if (re) refreshServerInfo(I.event.group.id)
+        val serverCount = I.sp[1].toInt()
+        groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+            if (index + 1 == serverCount) {
+                if (it.gameID.isNullOrEmpty() || it.serverRspID == 0) {
+                    if (re) return serverInfoRErr.toPlainText()
+                    unVipPlayer(I, re = true)
+                    return serverInfoRefreshing.toPlainText()
                 }
-                //sendMsg(I,"查找此人PID")
-                val pid = getPersonaid(I.sp[1])
-                if (!pid.isSuccessful) return "查找PID失败".toPlainText()
-                if (serverName.isEmpty()) return "未定义默认服务器名称".toPlainText()
-                //sendMsg(I,"查找该服务器")
-                val serverID = BF1Api.searchServer(serverName)
-                if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
-                val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-                exc.forEach { (t, u) ->
-                    val serverDetails = getFullServerDetails(u, t)
-                    serverDetails.result?.rspInfo?.server?.serverId?.let { removeServerVIP(u, it.toInt(), pid.id.toString()) }
+                val pid = getPersonaid(I.sp[2])
+                if (!pid.isSuccessful) {
+                    if (re) return serverInfoRErr.toPlainText()
+                    unVipPlayer(I, true)
+                    return serverInfoRefreshing.toPlainText()
                 }
-                return "移除Vip完了".toPlainText()
-            } else {
-                return "参数不足".toPlainText()
+                val serverVIP = removeServerVIP(it.sessionId.toString(), it.serverRspID, pid.id.toString())
+                if (serverVIP.isSuccessful) {
+                    removeVip(I.event.group.id, serverCount, I.sp[2])
+                    return unVIPSucc.replace("//id//", I.sp[2]).replace("//serverCount//", "$serverCount").toPlainText()
+                } else {
+                    if (re) return serverInfoRErr.toPlainText()
+                    unVipPlayer(I, true)
+                    return unVIPErr.replace("//id//", I.sp[2]).replace("//err//", serverVIP.reqBody).toPlainText()
+                }
             }
-        } else {
-            return "非管理员".toPlainText()
         }
+        return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
+
     //TODO 查询VIP实现
-    private fun getVipList(I: PullIntent):Message{
-        var serverName = ""
+    private fun getVipList(I: PullIntent): Message {
+        /*var serverName = ""
         ServerNameData.forEach { (t, u) ->
             if (t == I.event.group.id) {
                 serverName = u
@@ -581,119 +704,88 @@ object Intent {
         val serverID = BF1Api.searchServer(serverName)
         if (!serverID.isSuccessful) return "查找服务器失败".toPlainText()
         val exc: HashMap<String, String> = getGameIDList(I.event.group.id, serverID)
-        val fullServerInfoJson:MutableList<FullServerInfoJson> = mutableListOf()
+        val fullServerInfoJson: MutableList<FullServerInfoJson> = mutableListOf()
         exc.forEach { (t, u) ->
-            fullServerInfoJson.add(getFullServerDetails(u,t))
-        }
-        fullServerInfoJson.forEach {
-            if (it.isSuccessful == true){
-                var vipStr=""
-                it.result?.rspInfo?.vipList?.forEach {
-                    vipStr += "ID:${it.displayName}\n"
-                }
-                sendMsg(I, "服务器VIP:\n$vipStr")
-            }else{
-                return "查询失败".toPlainText()
-            }
-        }
-        return "查询完成".toPlainText()
-    }
-
-    //TODO 查询服务器的gameID和ssid
-    private fun getGameIDList(groupID: Long, serverID: ServerSearchJson): HashMap<String, String> {
-        val exc: HashMap<String, String> = hashMapOf()
-        GroupID.forEach { (t, u) ->
-            //是否此群
-            if (t == groupID) {
-                //群绑定服务器遍历
-                u.forEach {
-                    it.forEach { (s, r) ->
-                        serverID.servers?.forEach {
-                            if (it.serverId == s) {
-                                //gameid,ssid
-                                it.gameId?.let { it1 -> exc.put(it1, r) }
-                            }
+            fullServerInfoJson.add(getFullServerDetails(u, t))
+        }*/
+        if (I.cmdSize < 2) return parameterErr.replace("//para//", "*gv <ServerCount>").toPlainText()
+        val serverCount = I.sp[1].toInt()
+        val serverSize = groupData[I.event.group.id]?.server?.size
+        var p = "服务器${serverCount}的临时VIP:\n"
+        if (serverSize != null) {
+            if (serverSize >= serverCount) {
+                groupData[I.event.group.id]!!.server.forEachIndexed { index, it ->
+                    if (index + 1 == serverCount) {
+                        it.vipList.forEach { id, endTime ->
+                            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                            val sd = sdf.format(Date(endTime.toLong()))
+                            p += "ID:${id} 到期时间:${sd}\n"
                         }
                     }
                 }
             }
         }
-        return exc
-    }
-    //TODO 查询服务器的serverid和ssid
-    private fun getServerIDList(groupID: Long, serverID: ServerSearchJson): HashMap<String, String> {
-        val exc: HashMap<String, String> = hashMapOf()
-        GroupID.forEach { (t, u) ->
-            //是否此群
-            if (t == groupID) {
-                //群绑定服务器遍历
-                u.forEach {
-                    it.forEach { (s, r) ->
-                        serverID.servers?.forEach {
-                            if (it.serverId == s) {
-                                //serverid,ssid
-                                exc.put(s, r)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return exc
+        return p.toPlainText()
     }
 
     //TODO 绑定服务器实现
     private fun bindingServer(I: PullIntent): Message {
         if (I.isAdmin) {
             when (I.cmdSize) {
-                in 1..2 -> return GroupID.toString().toPlainText()
-                in 3..4 -> {
+                in 1..2 -> {
+                    var temp = "绑定的服务器\n"
+                    groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
+                        temp += """
+                            Server:${index + 1}:
+                            ServerName:${it.serverName}
+                            ServerGuid:${it.serverGuid}
+                            GameID:${it.gameID}
+                        """.trimIndent() + "\n"
+                    }
+                    return temp.toPlainText()
+                }
+
+                in 3..5 -> {
                     when (I.sp[1]) {
                         "add" -> {
-                            return if (I.sp[2].isNotEmpty()) {
-                                if (addBindServer(I.event.group.id, I.sp[2])) {
+                            return if (I.sp[2].isNotEmpty() && I.sp[3].isNotEmpty()) {
+                                if (groupData[I.event.group.id]?.server?.add(
+                                        ServerInfoForSave(
+                                            serverGuid = I.sp[2],
+                                            serverName = I.sp[3]
+                                        )
+                                    ) == true
+                                ) {
                                     "成功".toPlainText()
                                 } else {
                                     "已存在该绑定".toPlainText()
                                 }
                             } else {
-                                "参数不足".toPlainText()
+                                parameterErr.replace("//para//", "*bds add <ServerID> <ServerName>").toPlainText()
                             }
                         }
 
                         "remove" -> {
                             return if (I.sp[2].isNotEmpty()) {
-                                removeBindServer(I.event.group.id, I.sp[2])
+                                groupData[I.event.group.id]?.server?.removeIf {
+                                    it.serverGuid == I.sp[2]
+                                }
                                 "成功".toPlainText()
                             } else {
-                                "参数不足".toPlainText()
+                                parameterErr.replace("//para//", "*bds remove <ServerID>").toPlainText()
                             }
                         }
 
-                        else -> return "无效参数".toPlainText()
+                        else -> return parameterErr.replace("//para//", "*bds <add/remove/list>").toPlainText()
                     }
                 }
 
                 else -> {
-                    return "未知命令".toPlainText()
+                    return errCommand.replace("//err//", "").toPlainText()
                 }
             }
         } else {
-            return "非管理员,无法执行".toPlainText()
-        }
-    }
-
-    //TODO 绑定服务器名称
-    private fun bindingServerName(I: PullIntent): Message {
-        return if (I.isAdmin) {
-            if (I.cmdSize > 1) {
-                ServerNameData[I.event.group.id] = I.sp[1]
-                "设置成功".toPlainText()
-            } else {
-                "参数不足".toPlainText()
-            }
-        } else {
-            "非管理员权限".toPlainText()
+            return notAdminErr.toPlainText()
         }
     }
 
@@ -701,73 +793,40 @@ object Intent {
     private fun bindingServerSessionId(I: PullIntentTemp): Message {
         if (I.isAdmin) {
             if (I.cmdSize > 2) {
-                val ssid = getWelcomeMessage(I.sp[2])
                 val apiLocale = setAPILocale(I.sp[2])
-                if (!ssid.isSuccessful) return "失败请重试".toPlainText()
-                if (!apiLocale.isSuccessful) return "失败请重试".toPlainText()
+                if (!apiLocale.isSuccessful) return "失败请重试\n${apiLocale.reqBody}".toPlainText()
+                val ssid = getWelcomeMessage(I.sp[2])
+                if (!ssid.isSuccessful) return "失败请重试\n${apiLocale.reqBody}".toPlainText()
                 return if (I.sp[1] == "All") {
-                    GroupID[I.event.group.id]?.forEach {
-                        it.forEach { (t, u) ->
-                            it[t] = I.sp[2]
-                        }
-                    }
+                    setBindServer(I.event.group.id, "All", I.sp[2])
                     "绑定成功\n${ssid.firstMessage}".toPlainText()
                 } else {
                     setBindServer(I.event.group.id, I.sp[1], I.sp[2])
                     "绑定成功\n${ssid.firstMessage}".toPlainText()
                 }
             } else {
-                return "参数不足".toPlainText()
+                return parameterErr.replace("//para//", "*bdssid <ServerID> <SessionID>").toPlainText()
             }
         } else {
-            return "不是管理员".toPlainText()
+            return notAdminErr.toPlainText()
         }
     }
 
-    //TODO 添加绑定服务器
-    private fun addBindServer(gid: Long, string: String): Boolean =
-        GroupID[gid]!!.add(mutableMapOf(Pair(string, "")))
-
     //TODO 修改绑定服务器
     private fun setBindServer(gid: Long, serverID: String, sessionId: String = ""): Boolean {
-        GroupID[gid]?.forEach {
-            it.forEach { (t, u) ->
-                if (t == serverID) {
-                    it[t] = sessionId
-                }
+        groupData[gid]?.server?.forEach {
+            if (serverID == "All") {
+                it.sessionId = sessionId
+            }
+            if (it.serverGuid == serverID) {
+                it.sessionId = sessionId
             }
         }
         return true
     }
 
-    //TODO 移除绑定服务器
-    private fun removeBindServer(gid: Long, serverID: String) {
-        GroupID.values.forEach {
-            it.removeIf {
-                it[serverID] != null
-            }
-        }
-    }
-
-    //TODO 查询是否已绑定EAID
-    private fun getEAID(I: PullIntent): String {
-        return if (I.cmdSize > 1) {
-            I.sp[1]
-        } else {//查询自己
-            var eaid = ""
-            bindingData.forEach {
-                if (it.key == I.event.sender.id) {
-                    eaid = it.value
-                }
-            }
-            return eaid.ifEmpty {
-                ""
-            }
-        }
-    }
-
     //TODO 发送信息
-    private fun sendMsg(I: PullIntent, msg: Any) {
+    fun sendMsg(I: PullIntent, msg: Any) {
         CoroutineScope(Dispatchers.IO).launch {
             if (msg is Message) {
                 I.event.subject.sendMessage(msg)

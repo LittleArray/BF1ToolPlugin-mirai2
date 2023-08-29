@@ -6,6 +6,7 @@ import net.mamoe.mirai.console.command.descriptor.ExperimentalCommandDescriptors
 import net.mamoe.mirai.console.permission.PermissionService.Companion.permit
 import top.ffshaozi.BF1ToolPlugin
 import top.ffshaozi.command.BF1Cmd.group
+import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
 import top.ffshaozi.utils.Value.groups
 
@@ -25,7 +26,7 @@ object BF1Cmd : CompositeCommand(
         when (operation) {
             "add" -> {
                 if (groupId != null) {
-                    Setting.GroupID.put(groupId, mutableSetOf())
+                    Setting.groupData[groupId] = DataForGroup()
                     sendMessage("添加成功")
                 } else {
                     sendMessage("添加失败")
@@ -33,13 +34,13 @@ object BF1Cmd : CompositeCommand(
             }
 
             "remove" -> {
-                Setting.GroupID.remove(groupId)
+                Setting.groupData.remove(groupId)
                 sendMessage("移除成功")
             }
 
             "get" -> {
                 var temp=""
-                Setting.GroupID.forEach {
+                Setting.groupData.forEach {
                     temp += "${it.key}+,"
                 }
                 sendMessage("已绑定群号:$temp")
