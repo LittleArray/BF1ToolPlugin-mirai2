@@ -489,6 +489,7 @@ object Intent {
                     searchServerList(I, re = true)
                     return serverInfoRefreshing.toPlainText()
                 }
+                sendMsg(I,searching.replace("//id//",I.sp[2]).replace("//action//","服务器玩家"))
                 val serverListJson = searchServerList(it.gameID!!)
                 return if (serverListJson.isSuccessful == true) {
                     var p = "在服务器${serverCount}中查找到\n"

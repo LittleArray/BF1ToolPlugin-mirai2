@@ -21,7 +21,7 @@ object Value{
     *-alias 别名  -删除别名*/
     var groups=""
     val helpText = """
-        这里是Neri家的专属BF1机器人 v1.0.0
+        Nekomura Haruka の BF1QQRobot v1.0.0
         感谢api.gametools.network,battlefieldtracker.com,www.bfeac.com提供的数据接口
         通用指令:
         *help
