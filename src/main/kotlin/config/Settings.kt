@@ -12,7 +12,8 @@ object Setting : AutoSavePluginData("Setting") {
 @Serializable
 data class DataForGroup(
     var server:MutableSet<ServerInfoForSave> = mutableSetOf(),
-    var bindingData:MutableMap<Long,String> = mutableMapOf()//key是qq号
+    var bindingData:MutableMap<Long,String> = mutableMapOf(),//key是qq号
+    var recentlyTempWhitelist:MutableSet<String> = mutableSetOf()
 )
 @Serializable
 data class ServerInfoForSave(
@@ -22,5 +23,10 @@ data class ServerInfoForSave(
     var serverRspID:Int = 0,
     var serverGuid:String?=null,
     var players:Int= 0,
+    var isEnableRecentlyKick:Boolean= true,
+    var recentlyMaxKD:Float= 2.0F,
+    var recentlyMaxKPM:Float= 1.5F,
+    var lifeMaxKD:Float= 1.5F,
+    var lifeMaxKPM:Float= 1.5F,
     var vipList: MutableMap<String,Float> = mutableMapOf()
 )

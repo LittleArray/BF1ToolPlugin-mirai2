@@ -1,5 +1,7 @@
 package top.ffshaozi.data
 
+import java.util.Date
+
 /**
  * @Description
  * @Author littleArray
@@ -14,4 +16,12 @@ data class RecentlyJson(
     var tp:String="-1",
     var rp:String="0",
     val isSuccessful:Boolean = true
+)
+data class RecentlyServerJson(
+    var serverName:String ?= "",
+    var time:Date?=null,
+    var map:String?="",
+    var kd: String="-1",
+    var kills:String="-1",
+    var deaths:String="-1"
 )

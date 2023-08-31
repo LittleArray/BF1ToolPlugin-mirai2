@@ -2,6 +2,7 @@ package top.ffshaozi.utils
 
 import com.google.gson.Gson
 import data.EacInfoJson
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -104,8 +105,8 @@ object BF1Api {
                 .build()
             val response = okHttpClient
                 .newBuilder()
-                .connectTimeout(10, TimeUnit.SECONDS)//设置连接超时时间
-                .readTimeout(10, TimeUnit.SECONDS)//设置读取超时时间
+                .connectTimeout(15, TimeUnit.SECONDS)//设置连接超时时间
+                .readTimeout(15, TimeUnit.SECONDS)//设置读取超时时间
                 .build()
                 .newCall(request).execute()
             if (response.isSuccessful) {
@@ -123,18 +124,18 @@ object BF1Api {
                     PostResponse(isSuccessful = true, reqBody = res)
                 } else {
                     if (isLog)
-                        Glogger.warning("数据Api请求失败")
+                        Glogger.error("数据Api请求失败")
                     PostResponse(isSuccessful = false, error = "null body")
                 }
             } else {
                 val res = response.body?.string()
                 if (res != null) {
                     if (isLog)
-                        Glogger.info("数据Api请求失败:${res}")
+                        Glogger.error("数据Api请求失败:${res}")
                     PostResponse(isSuccessful = false, reqBody = res)
                 } else {
                     if (isLog)
-                        Glogger.warning("数据Api请求失败")
+                        Glogger.error("数据Api请求失败")
                     PostResponse(isSuccessful = false, error = "null body")
                 }
             }
@@ -217,8 +218,8 @@ object BF1Api {
     }
 
     //BFEAC查询
-    fun seaechBFEAC(eaid: String): EacInfoJson {
-        val postResponse = getApi("https://api.bfeac.com/case/EAID/$eaid", false)
+    fun seaechBFEAC(eaid: String, isLog: Boolean = true): EacInfoJson {
+        val postResponse = getApi("https://api.bfeac.com/case/EAID/$eaid", isLog)
         return if (postResponse.isSuccessful) {
             Gson().fromJson(postResponse.reqBody, EacInfoJson::class.java)
         } else {
@@ -227,55 +228,114 @@ object BF1Api {
     }
 
     //最近查询
-    fun recentlySearch(eaid: String):List<RecentlyJson>{
-        val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}")
+    fun recentlySearch(eaid: String, isLog: Boolean = true): List<RecentlyJson> {
+        val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}", isLog)
         if (!reqBody.isSuccessful) return listOf(RecentlyJson(isSuccessful = false))
         //println(reqBody)
         //document.getElementsByTagName("title")[0].innerHTML
         val document = Jsoup.parse(reqBody.reqBody)
         val elements = document.html(reqBody.reqBody).getElementsByClass("sessions")
         val ltemp = mutableListOf<RecentlyJson>()
-        elements.forEach {
+        elements.forEach a@{
             val date =
                 it.getElementsByClass("time").first()?.getElementsByAttribute("data-livestamp")?.attr("data-livestamp")
             it.getElementsByClass("session-stats").forEach {
                 val temp = RecentlyJson()
-                it.children().forEachIndexed {index,ctx ->
-                    when(index){
-                        0 -> temp.spm = ctx.children().first()?.html()!!
-                        1 -> temp.kd = ctx.children().first()?.html()!!
-                        2 -> temp.kpm = ctx.children().first()?.html()!!
-                        3 -> temp.bs = ctx.children().first()?.html()!!
-                        4 -> temp.gs = ctx.children().first()?.html()!!
-                        5 -> temp.tp = ctx.children().first()?.html()!!
+                it.children().forEachIndexed { index, ctx ->
+                    when (index) {
+                        0 -> temp.spm = ctx.children().first()?.text()!!
+                        1 -> {
+                            if (ctx.children().first()?.text()!! == "0.00") {
+                                return@a
+                            }
+                            temp.kd = ctx.children().first()?.text()!!
+                        }
+
+                        2 -> temp.kpm = ctx.children().first()?.text()!!
+                        3 -> temp.bs = ctx.children().first()?.text()!!
+                        4 -> temp.gs = ctx.children().first()?.text()!!
+                        5 -> temp.tp = ctx.children().first()?.text()!!
                     }
                 }
-                temp.rp = SimpleDateFormat("yyyy-MM-dd HH:mm").format(getDateByStringBIH(date.toString()))
+                temp.rp = SimpleDateFormat("MM-dd HH:mm").format(getDateByStringBIH(date.toString()))
                 ltemp.add(temp)
             }
         }
-        if (ltemp.size == 0) listOf(RecentlyJson(isSuccessful = false))
+        if (ltemp.size == 0) return listOf(RecentlyJson(isSuccessful = false))
         return ltemp
     }
 
-    fun recentlyServerSearch(eaid: String):LinkedHashMap<String,String>{
-        val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}/matches",false)
-        if (!reqBody.isSuccessful) return linkedMapOf()
-        //println(reqBody)
-        //document.getElementsByTagName("title")[0].innerHTML
+    fun recentlyServerSearch(eaid: String): MutableSet<RecentlyServerJson> {
+        val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}/matches", false)
         val document = Jsoup.parse(reqBody.reqBody)
-        val elements = document.html(reqBody.reqBody).getElementsByClass("card matches")
-        val ltemp = linkedMapOf<String,String>()
-        elements.forEach {
-            it.getElementsByClass("details").forEach {
-                ltemp.put(
-                    it.getElementsByClass("title").text().replace("Conquest on ",""),
-                    it.getElementsByClass("description").text()
-                )
+        val elements = document.getElementsByClass("card matches").iterator()
+        val data: MutableSet<RecentlyServerJson> = mutableSetOf()
+        runBlocking {
+            while (elements.hasNext()) {
+                val next = elements.next()
+                var i = 0
+                next.getElementsByClass("match").forEachIndexed { index, it ->
+                    if (i > 4) return@forEachIndexed
+                    val details = it.getElementsByClass("details").first()?.getElementsByClass("description")?.text()
+                    val split = details?.split(" on ")
+                    var temp = RecentlyServerJson(
+                        map = it.getElementsByClass("details").first()
+                            ?.getElementsByClass("title")
+                            ?.text()
+                            ?.replace("Conquest on ", "[征服]")
+                            ?.replace("BreakthroughLarge0 on","[行动]"),
+                        serverName = split?.get(0),
+                        time = timeTR(split?.get(1))
+                    )
+                    val matchUrl = "https://battlefieldtracker.com${it.attr("href")}"
+                    var matchBody = BF1Api.getApi(matchUrl)
+                    if (!matchBody.isSuccessful) {
+                        Thread.sleep(8000)
+                        matchBody = BF1Api.getApi(matchUrl)
+                        if (!matchBody.isSuccessful)
+                            return@forEachIndexed
+                    }
+                    val matchDoc = Jsoup.parse(matchBody.reqBody)
+                    val matchIterator = matchDoc.getElementsByClass("player-header").iterator()
+                    while (matchIterator.hasNext()) {
+                        val matchNext = matchIterator.next()
+                        if (matchNext.getElementsByClass("player-name").first()?.text()?.indexOf(eaid) != -1) {
+                            matchNext.getElementsByClass("quick-stats").forEach {
+                                if (it.child(1).getElementsByClass("value").text() == "0") return@forEachIndexed
+                                temp = temp.copy(kills = it.child(1).getElementsByClass("value").text())
+                                temp = temp.copy(deaths = it.child(2).getElementsByClass("value").text())
+                                temp = temp.copy(kd = it.child(4).getElementsByClass("value").text())
+                            }
+                        }
+                    }
+                    i++
+                    data.add(temp)
+                }
             }
         }
-        if (ltemp.size == 0) return linkedMapOf()
-        return ltemp
+        return data
+    }
+
+    fun timeTR(dateS: String?): Date? {
+        var date = dateS
+        return if (!date.isNullOrEmpty()) {
+            date = if (date.indexOf("AM") != -1) {
+                date.replace("AM", "PM")
+            } else {
+                date.replace("PM", "AM")
+            }
+            val sdf = SimpleDateFormat("M/dd/yyyy hh:mm:ss aa", Locale.ENGLISH)
+            val chinaSdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+            try {
+                val time = Date(sdf.parse(date).time + 1000 * 60 * 60)
+                val result = chinaSdf.format(time)
+                chinaSdf.parse(result)
+            } catch (e: java.lang.Exception) {
+                throw RuntimeException("转换为日期类型错误timeTR")
+            }
+        } else {
+            null
+        }
     }
 
     /**

@@ -17,8 +17,6 @@ import top.ffshaozi.config.Setting
 import top.ffshaozi.config.Setting.groupData
 import top.ffshaozi.utils.Intent
 import top.ffshaozi.utils.Value.groups
-import org.jsoup.Jsoup.*
-import top.ffshaozi.utils.BF1Api.recentlySearch
 
 object BF1ToolPlugin : KotlinPlugin(
     JvmPluginDescription(
@@ -49,7 +47,7 @@ object BF1ToolPlugin : KotlinPlugin(
                     "检测到Bot:${it.id}上线"
                 }
                 it.bot.groups.forEach {
-                    groups = groups + it.name + "   " + it.id + "\n"
+                    groups = groups + it.name + "   " + it.id + ","
                 }
                 logger.info("获取到的群聊 $groups")
                 Glogger.info("重注册${it.id}群临时会话事件响应 ")

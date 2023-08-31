@@ -121,7 +121,8 @@ object Intent {
             isAdmin = isAdmin,
             cmdSize = cmdSize
         )
-        val vp = listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*武器")
+        val vp =
+            listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*步枪", "*制式步枪")
         var result: Message? = null
         val cmdList = hashMapOf(
             listOf("*vips") to { vipRefresh(pullIntent) },
@@ -130,12 +131,14 @@ object Intent {
             listOf("*bd", "*绑定") to { bindingUser(pullIntent) },
             listOf("*ss", "*f") to { searchServer(pullIntent) },
             listOf("*ssi", "*cxlb") to { searchServerListPlayer(pullIntent) },
-            listOf("*c", "*查询","*战绩") to { searchMe(pullIntent) },
+            listOf("*c", "*查询", "*战绩") to { searchMe(pullIntent) },
             listOf("*vp", "*载具") to { searchVehicle(pullIntent) },
             listOf("*wp", "*武器") to { searchWp(pullIntent) },
             listOf("*rec", "*最近") to { searchRecently(pullIntent) },
             listOf("*pl", "*玩家列表") to { searchServerList(pullIntent) },
             listOf("*bds", "*绑服") to { bindingServer(pullIntent) },
+            listOf("*setkd") to { setKDInfo(pullIntent) },
+            listOf("*抗压") to { wl(pullIntent) },
             listOf("*k", "*kick", "*踢人") to { kickPlayer(pullIntent) },
             listOf("*b", "*ban") to { banPlayer(pullIntent) },
             listOf("*eac", "*eacban") to { searchEACBan(pullIntent) },
@@ -229,15 +232,16 @@ object Intent {
         if (eacInfoJson.error_code != 0) return PlainText(nullEac.replace("//id//", id))
         if (eacInfoJson.data.isNullOrEmpty()) return PlainText(nullEac.replace("//id//", id))
         return when (eacInfoJson.data[0].current_status) {
-            0 ->  PlainText("ID:${eacInfoJson.data[0].current_name}有记录但未处理\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            1 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为石锤\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            2 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为证据不足\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            3 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证通过\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            4 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证中\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            5 ->  PlainText("ID:${eacInfoJson.data[0].current_name}判定为刷枪\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            0 -> PlainText("ID:${eacInfoJson.data[0].current_name}有记录但未处理\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            1 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为石锤\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            2 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为证据不足\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            3 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证通过\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            4 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证中\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            5 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为刷枪\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
             else -> PlainText("ID:${eacInfoJson.data[0].current_name}未知判定\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
         }
     }
+
     //TODO 最近实现
     private fun searchRecently(I: PullIntent): Message {
         var id = getBinding(I.event.group.id, I.event.sender.id)
@@ -248,26 +252,26 @@ object Intent {
         val recentlyJson = recentlySearch(id)
         val hashMap = recentlyServerSearch(id)
         var temp = "${id}的最近数据\n"
-        recentlyJson.forEachIndexed() {index,it->
-            if (index + 1 > 3) return@forEachIndexed
+        recentlyJson.forEachIndexed() { index, it ->
+            if (index + 1 > 2) return@forEachIndexed
             if (!it.isSuccessful) return PlainText(searchErr.replace("//action//", "最近数据"))
-            temp +="""
-            统计时间:${it.rp}
-            游玩时间:${it.tp}
-            最近SPM:${it.spm}
-            最近KPM:${it.kpm}
-            最近KD:${it.kd}
-            """.trimIndent()+"\n=============\n"
+            temp += """
+            统计时间:${it.rp} 游玩时间:${it.tp.replace("h", "小时").replace("m", "分钟")}
+            最近SPM/KPM/KD:${it.spm}/${it.kpm}/${it.kd}
+            """.trimIndent() + "\n==========================\n"
         }
-        temp +="最近游玩服务器:\n"
-        hashMap.forEach { (map, name) ->
-            temp +="""
-            服务器:${name}
-            地图:${map}
-            """.trimIndent()+"\n=============\n"
+        temp += "\n${id}最近游玩服务器:\n"
+        hashMap.forEach {
+            temp += """
+            服务器:${it.serverName} 
+            地图:${it.map}
+            击杀/死亡/KD:${it.kills}/${it.deaths}/${it.kd}
+            对局时间:${SimpleDateFormat("MM-dd HH:mm:ss").format(it.time)}
+            """.trimIndent() + "\n==========================\n"
         }
         return temp.toPlainText()
     }
+
     //TODO 查询武器实现
     private fun searchWp(I: PullIntent, type: String? = null): Message {
         val typeI = when (type) {
@@ -305,10 +309,11 @@ object Intent {
                                         """
                             武器名:${it.weaponName} 
                             武器击杀数:${it.kills}
-                            爆头率:${it.headshots}
                             爆头击杀:${it.headshotKills}
+                            爆头率:${it.headshots}
                             命中率:${it.accuracy}
-                            配备时长:${it.timeEquipped/60/60}h
+                            KPM:${it.killsPerMinute}
+                            配备时长:${it.timeEquipped / 60 / 60}h
                             枪械类型:${it.type}
                                             """.trimIndent()
                                     )
@@ -324,8 +329,11 @@ object Intent {
                                     """
                             武器名:${it.weaponName} 
                             武器击杀数:${it.kills}
+                            爆头击杀:${it.headshotKills}
                             爆头率:${it.headshots}
                             命中率:${it.accuracy}
+                            KPM:${it.killsPerMinute}
+                            配备时长:${it.timeEquipped / 60 / 60}h
                             枪械类型:${it.type}
                                             """.trimIndent()
                                 )
@@ -420,15 +428,16 @@ object Intent {
                         var player = 0
                         val team1 = I.event.buildForwardMessage {
                             add(I.event.bot.id, "teamOne", "队伍1".toPlainText())
-                            serverListJson.teams?.forEach {
-                                if (it.teamid == "teamOne") {
-                                    it.players.forEach {
+                            serverListJson.teams?.forEach { team ->
+                                if (team.teamid == "teamOne") {
+                                    team.players.forEach {
                                         add(
-                                            I.event.bot.id, "teamOne", PlainText(
+                                            I.event.bot.id, team.name, PlainText(
                                                 """
                                                     ID:${it.name} Lv.${it.rank}
-                                                    Ping:${it.latency} 
-                                                    在线时长:${(System.currentTimeMillis() - it.join_time / 1000) / 1000 / 60}mins
+                                                    延迟:${it.latency} ms
+                                                    小队:${it.platoon}
+                                                    在线:${(System.currentTimeMillis() - it.join_time / 1000) / 1000 / 60}min
                                                 """.trimIndent()
                                             )
                                         )
@@ -439,15 +448,16 @@ object Intent {
                         }
                         val team2 = I.event.buildForwardMessage {
                             add(I.event.bot.id, "teamOne", "队伍2".toPlainText())
-                            serverListJson.teams?.forEach {
-                                if (it.teamid == "teamTwo") {
-                                    it.players.forEach {
+                            serverListJson.teams?.forEach { team ->
+                                if (team.teamid == "teamTwo") {
+                                    team.players.forEach {
                                         add(
-                                            I.event.bot.id, "teamOne", PlainText(
+                                            I.event.bot.id,team.name , PlainText(
                                                 """
                                                     ID:${it.name} Lv.${it.rank}
-                                                    Ping:${it.latency} 
-                                                    游玩时长:${(Instant.now().epochSecond - it.join_time / 1000000) / 60}mins
+                                                    延迟:${it.latency} ms
+                                                    小队:${it.platoon}
+                                                    在线:${(System.currentTimeMillis() - it.join_time / 1000) / 1000 / 60}min
                                                 """.trimIndent()
                                             )
                                         )
@@ -458,10 +468,12 @@ object Intent {
                         }
                         add(
                             I.event.bot.id, I.event.bot.nick, PlainText(
-                                """  
-                               服务器:${serverListJson.serverinfo?.name}
-                               地图:${serverListJson.serverinfo?.level}
-                               在线人数:${player}/64
+                                """
+                                名称:${serverListJson.serverinfo?.name}
+                                地图:${serverListJson.serverinfo?.level?.replace("MP_", "")}
+                                模式:${serverListJson.serverinfo?.mode?.replace("Conquest", "征服")?.replace("BreakthroughLarge0","行动")}
+                                人数:${player}/64
+                                描述:${serverListJson.serverinfo?.description?.replace("\n","")?.substring(0,32)}
                                 """.trimIndent()
                             )
                         )
@@ -476,6 +488,7 @@ object Intent {
         }
         return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
+
     //TODO 搜索服务器玩家
     private fun searchServerListPlayer(I: PullIntent, re: Boolean = false): Message {
         if (I.cmdSize < 3) return parameterErr.replace("//para//", "*ssi <ServerCount> <ID>").toPlainText()
@@ -489,25 +502,26 @@ object Intent {
                     searchServerList(I, re = true)
                     return serverInfoRefreshing.toPlainText()
                 }
-                sendMsg(I,searching.replace("//id//",I.sp[2]).replace("//action//","服务器玩家"))
+                sendMsg(I, searching.replace("//id//", I.sp[2]).replace("//action//", "服务器玩家"))
                 val serverListJson = searchServerList(it.gameID!!)
                 return if (serverListJson.isSuccessful == true) {
                     var p = "在服务器${serverCount}中查找到\n"
-                    serverListJson.teams?.forEach {team ->
+                    serverListJson.teams?.forEach { team ->
                         team.players.forEach {
-                            if (it.name.indexOf(I.sp[2],0,true) != -1){
+                            if (it.name.indexOf(I.sp[2], 0, true) != -1) {
                                 p += "ID:${it.name} 所在队伍:${team.name}\n"
                             }
                         }
                     }
                     p.toPlainText()
-                }else{
-                    searchErr.replace("//action//","服务器玩家").toPlainText()
+                } else {
+                    searchErr.replace("//action//", "服务器玩家").toPlainText()
                 }
             }
         }
         return nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
+
     //TODO 踢人实现
     private fun kickPlayer(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return notAdminErr.toPlainText()
@@ -521,16 +535,20 @@ object Intent {
                 kickPlayer(I, true)
                 return serverInfoRefreshing.toPlainText()
             }
-            val kickR = when(I.sp[2]){
+            val kickR = when (I.sp[2]) {
                 "*tj" -> "禁止偷家"
                 "*zz" -> "禁止蜘蛛人"
                 "*ur" -> "違反規則"
                 "*nf" -> "nuan 服战神是吧"
                 else -> I.sp[2]
             }
-            val kickPlayer = kickPlayer(it.sessionId!!, it.gameID!!, pid.id.toString(),kickR)
+            val kickPlayer = kickPlayer(it.sessionId!!, it.gameID!!, pid.id.toString(), kickR)
             if (kickPlayer.isSuccessful) {
-                sendMsg(I, kickSucc.replace("//id//", I.sp[1]).replace("//serverCount//", "${index+1}").replace("//res//",kickR))
+                sendMsg(
+                    I,
+                    kickSucc.replace("//id//", I.sp[1]).replace("//serverCount//", "${index + 1}")
+                        .replace("//res//", kickR)
+                )
             } else {
                 refreshServerInfo(I.event.group.id)
                 sendMsg(I, kickErr.replace("//id//", I.sp[1]).replace("//err//", kickPlayer.reqBody))
@@ -555,10 +573,10 @@ object Intent {
                 }
                 val serverBan = addServerBan(it.sessionId!!, it.serverRspID, I.sp[2])
                 if (serverBan.isSuccessful) {
-                    return banSucc.replace("//id//", I.sp[1]).replace("//serverCount//", "$serverCount").toPlainText()
+                    return banSucc.replace("//id//", I.sp[2]).replace("//serverCount//", "$serverCount").toPlainText()
                 } else {
                     refreshServerInfo(I.event.group.id)
-                    return banErr.replace("//id//", I.sp[1]).replace("//err//", serverBan.reqBody).toPlainText()
+                    return banErr.replace("//id//", I.sp[2]).replace("//err//", serverBan.reqBody).toPlainText()
                 }
             }
         }
@@ -824,6 +842,80 @@ object Intent {
             }
         }
         return true
+    }
+
+    //TODO 修改服务器kd实现
+    private fun setKDInfo(I: PullIntent): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (I.cmdSize < 4) return parameterErr.replace("//para//", "*setkd <ServerCount> <lkd/lkp/rkd/rkp> <Float>")
+            .toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.replace("//err//", "").toPlainText()
+        val serverCount = I.sp[1].toInt()
+        when (I.sp[2]) {
+            "lkd" -> setKD(I.event.group.id, serverCount, lifeMaxKD = I.sp[3].toFloat())
+            "lkp" -> setKD(I.event.group.id, serverCount, lifeMaxKPM = I.sp[3].toFloat())
+            "rkp" -> setKD(I.event.group.id, serverCount, recentlyMaxKPM = I.sp[3].toFloat())
+            "rkd" -> setKD(I.event.group.id, serverCount, recentlyMaxKD = I.sp[3].toFloat())
+            else -> return parameterErr.replace("//para//", "*setkd <ServerCount> <lkd/lkp/rkd/rkp> <Float>")
+                .toPlainText()
+        }
+        return "成功".toPlainText()
+    }
+
+    //TODO 修改服务器kd
+    private fun setKD(
+        gid: Long,
+        serverCount: Int,
+        recentlyMaxKD: Float = 0F,
+        recentlyMaxKPM: Float = 0F,
+        lifeMaxKD: Float = 0F,
+        lifeMaxKPM: Float = 0F,
+    ): Boolean {
+        groupData[gid]?.server?.forEachIndexed { index, it ->
+            if (serverCount == index + 1) {
+                if (lifeMaxKD > 0)
+                    it.lifeMaxKD = lifeMaxKD
+                if (lifeMaxKPM > 0)
+                    it.lifeMaxKPM = lifeMaxKPM
+                if (recentlyMaxKPM > 0)
+                    it.recentlyMaxKPM = recentlyMaxKPM
+                if (recentlyMaxKD > 0)
+                    it.lifeMaxKD = recentlyMaxKD
+            }
+        }
+        return true
+    }
+
+    //TODO 修改服务器抗压白名单实现
+    private fun wl(I: PullIntent): Message {
+        if (!I.isAdmin) return notAdminErr.toPlainText()
+        if (isNullServer(I.event.group.id)) return nullServerErr.replace("//err//", "").toPlainText()
+        if (I.cmdSize < 2) return groupData[I.event.group.id]?.recentlyTempWhitelist.toString().toPlainText()
+        return if (addWl(I.event.group.id, I.sp[1])) {
+            "添加白名单成功".toPlainText()
+        } else {
+            "移除白名单成功".toPlainText()
+        }
+    }
+
+    //TODO 修改服务器抗压白名单
+    private fun addWl(
+        gid: Long,
+        eaid: String,
+    ): Boolean {
+        var temp = ""
+        groupData[gid]?.recentlyTempWhitelist?.forEach {
+            if (eaid == it) temp = it
+        }
+        return if (temp.isNotEmpty()) {
+            groupData[gid]?.recentlyTempWhitelist?.removeIf {
+                it == eaid
+            }
+            false
+        } else {
+            groupData[gid]?.recentlyTempWhitelist?.add(eaid)
+            true
+        }
     }
 
     //TODO 发送信息

@@ -25,6 +25,7 @@ dependencies{
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.jsoup:jsoup:1.16.1")
+    implementation("net.sf.cssbox:cssbox:5.0.1")
 }
 mirai {
     jvmTarget = JavaVersion.VERSION_1_8
