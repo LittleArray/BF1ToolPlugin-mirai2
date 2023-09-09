@@ -3,12 +3,9 @@ package top.ffshaozi.intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.contact.Contact.Companion.sendImage
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.*
-import net.mamoe.mirai.utils.ExternalResource.Companion.uploadAsImage
-import top.ffshaozi.BF1ToolPlugin
 import top.ffshaozi.config.CustomerLang
 import top.ffshaozi.config.Setting
 import top.ffshaozi.config.SettingController
@@ -88,7 +85,7 @@ object EnquiryService {
         }
         //查询
         Intent.sendMsg(I, CustomerLang.searching.replace("//id//", id).replace("//action//", "EACBan数据"))
-        val eacInfoJson = BF1Api.seaechBFEAC(id)
+        val eacInfoJson = BF1Api.searchBFEAC(id)
         if (eacInfoJson.error_code != 0) return PlainText(CustomerLang.nullEac.replace("//id//", id))
         if (eacInfoJson.data.isNullOrEmpty()) return PlainText(CustomerLang.nullEac.replace("//id//", id))
         return when (eacInfoJson.data[0].current_status) {
@@ -381,7 +378,7 @@ object EnquiryService {
                                     }
                                 }
                                 Setting.groupData[groupid]?.bindingData?.forEach {
-                                    if (it.value == id) {
+                                    if (it.value.indexOf(id,0,true) !=-1) {
                                         color = "pink"
                                         groupPlayer++
                                     }
@@ -389,7 +386,7 @@ object EnquiryService {
                                 run o@{
                                     Setting.groupData[groupid]?.bindingData?.forEach {
                                         Setting.groupData[groupid]?.operator?.forEach { qq ->
-                                            if (it.key == qq && it.value == id) {
+                                            if (it.key == qq && it.value.indexOf(id,0,true) !=-1) {
                                                 color = "#f9767b"
                                                 opPlayer++
                                                 return@o

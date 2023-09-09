@@ -109,7 +109,7 @@ object Cache {
         var team: String,
         var teamId: Int,
         var rank: Int,
-        var pid: Long,
+        var pid: Long = 0L,
         var platoon: String = "",
         var join_time: Long,
         var latency: Int,

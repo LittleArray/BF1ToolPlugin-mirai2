@@ -1,7 +1,7 @@
 package top.ffshaozi.utils
 
 import com.google.gson.Gson
-import data.EacInfoJson
+import data.*
 import kotlinx.coroutines.runBlocking
 import net.mamoe.mirai.console.MiraiConsole
 import net.mamoe.mirai.console.rootDir
@@ -10,15 +10,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
-import org.jsoup.internal.StringUtil
-import top.ffshaozi.BF1ToolPlugin
 import top.ffshaozi.BF1ToolPlugin.Glogger
 import top.ffshaozi.data.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlin.collections.HashMap
 
 
 data class PostResponse(
@@ -99,6 +96,52 @@ object BF1Api {
         } catch (ex: Exception) {
             if (isLog)
                 Glogger.error("服管Api请求出错:${ex.stackTraceToString()}")
+            PostResponse(isSuccessful = false, error = ex.stackTraceToString())
+        }
+    }
+
+    //EacApi接口
+    fun postEacApi(url: String,body: String, sessionId: String = "", isLog: Boolean = true): PostResponse {
+        return try {
+            if (isLog)
+                Glogger.info("EACApi请求:${body} SSID:${sessionId}")
+            val request = Request.Builder()
+                .url(url)
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .apply {
+                    if (sessionId.isNotBlank()) {
+                        addHeader("apikey", sessionId)
+                    }
+                }
+                .build()
+
+            val response = okHttpClient.newCall(request).execute()
+            return if (response.isSuccessful) {
+                val res = response.body?.string()
+                if (res != null) {
+                    if (isLog)
+                        Glogger.info("EACApi请求成功:${res}")
+                    PostResponse(isSuccessful = true, reqBody = res)
+                } else {
+                    Glogger.error("EACApi请求失败")
+                    PostResponse(isSuccessful = false, error = "null body")
+                }
+
+            } else {
+                val res = response.body?.string()
+                if (res != null) {
+                    if (isLog)
+                        Glogger.error("EACApi请求失败:${res}")
+                    PostResponse(isSuccessful = false, reqBody = res)
+                } else {
+                    if (isLog)
+                        Glogger.error("EACApi请求失败")
+                    PostResponse(isSuccessful = false, error = "null body")
+                }
+            }
+        } catch (ex: Exception) {
+            if (isLog)
+                Glogger.error("EACApi请求出错:${ex.stackTraceToString()}")
             PostResponse(isSuccessful = false, error = ex.stackTraceToString())
         }
     }
@@ -331,13 +374,42 @@ object BF1Api {
     }
 
     //BFEAC查询
-    fun seaechBFEAC(eaid: String, isLog: Boolean = true): EacInfoJson {
+    fun searchBFEAC(eaid: String, isLog: Boolean = true): EacInfoJson {
         val postResponse = getApi("https://api.bfeac.com/case/EAID/$eaid", isLog)
         return if (postResponse.isSuccessful) {
             Gson().fromJson(postResponse.reqBody, EacInfoJson::class.java)
         } else {
             EacInfoJson(error_code = 404)
         }
+    }
+    fun searchBFEACByPid(pid: String, isLog: Boolean = true): EacInfoByPID {
+        val postResponse = getApi("https://api.bfeac.com/case/pid/$pid", isLog)
+        return if (postResponse.isSuccessful) {
+            Gson().fromJson(postResponse.reqBody, EacInfoByPID::class.java)
+        } else {
+            EacInfoByPID(error_code = 404, data = null, error_msg = "")
+        }
+    }
+    //eac批量查询
+    fun searchBFEAC(pid: MultiCheckPostJson, isLog: Boolean = true): MultiCheckResponse {
+        val body = Gson().toJson(pid, MultiCheckPostJson::class.java)
+        val postResponse = postEacApi("https://api.bfeac.com/global_banlist/check/multi/pid",body,"",isLog)
+        return if (postResponse.isSuccessful) {
+            Gson().fromJson(postResponse.reqBody, MultiCheckResponse::class.java)
+        } else {
+            MultiCheckResponse(error_code = 404, data = listOf(), error_msg = "")
+        }
+    }
+
+    //kickLog
+    fun kickLogBFEAC(log: KickLogPost, sessionId: String, isLog: Boolean = true): PostResponse {
+        val body = Gson().toJson(log, KickLogPost::class.java)
+        return postEacApi("https://api.bfeac.com/inner_api/kicked_log", body, sessionId, isLog)
+    }
+    //举报功能
+    fun reportBFEAC(log: ReportToEAC, sessionId: String, isLog: Boolean = true): PostResponse {
+        val body = Gson().toJson(log, ReportToEAC::class.java)
+        return postEacApi("https://api.bfeac.com/inner_api/case_report", body, sessionId, isLog)
     }
 
     //最近查询

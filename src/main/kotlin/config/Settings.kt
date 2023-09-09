@@ -18,7 +18,8 @@ data class DataForGroup(
     var isUseBot:Boolean = true,
     var botGroup:String = "605712770",
     var botUrl:String = "https://asoul.zj.cn/api/warm/status",
-    var operator:MutableSet<Long> = mutableSetOf()
+    var operator:MutableSet<Long> = mutableSetOf(),
+    var eacApiKey:String = ""
 ){
     @Serializable
     data class ServerInfoForSave(
