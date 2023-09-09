@@ -3,12 +3,12 @@ package top.ffshaozi.command
 import net.mamoe.mirai.console.command.CommandSender
 import net.mamoe.mirai.console.command.CompositeCommand
 import net.mamoe.mirai.console.command.descriptor.ExperimentalCommandDescriptors
-import net.mamoe.mirai.console.permission.PermissionService.Companion.permit
 import top.ffshaozi.BF1ToolPlugin
-import top.ffshaozi.command.BF1Cmd.group
 import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
-import top.ffshaozi.utils.Value.groups
+import top.ffshaozi.config.Setting.groupData
+import top.ffshaozi.config.SettingController
+import top.ffshaozi.intent.Cache.BotGroups
 
 // 简单指令
 
@@ -19,6 +19,16 @@ object BF1Cmd : CompositeCommand(
 ) {
     @ExperimentalCommandDescriptors
     override val prefixOptional: Boolean = true
+
+    @SubCommand()
+    @Description("管理设定")
+    suspend fun CommandSender.op(groupId: Long?, opId: Long? = null) {
+        if (opId == null) {
+            sendMessage("${groupData[groupId]?.operator}")
+        } else {
+            groupId?.let { SettingController.setOperator(opId, it) }
+        }
+    }
 
     @SubCommand()
     @Description("群组设定")
@@ -39,7 +49,7 @@ object BF1Cmd : CompositeCommand(
             }
 
             "get" -> {
-                var temp=""
+                var temp = ""
                 Setting.groupData.forEach {
                     temp += "${it.key}+,"
                 }
@@ -47,7 +57,7 @@ object BF1Cmd : CompositeCommand(
             }
 
             "list" -> {
-                sendMessage("Bot拥有的群\n$groups")
+                sendMessage("Bot拥有的群\n$BotGroups")
             }
 
             else -> {

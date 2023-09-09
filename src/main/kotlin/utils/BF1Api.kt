@@ -3,14 +3,18 @@ package top.ffshaozi.utils
 import com.google.gson.Gson
 import data.EacInfoJson
 import kotlinx.coroutines.runBlocking
+import net.mamoe.mirai.console.MiraiConsole
+import net.mamoe.mirai.console.rootDir
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
 import org.jsoup.internal.StringUtil
+import top.ffshaozi.BF1ToolPlugin
 import top.ffshaozi.BF1ToolPlugin.Glogger
 import top.ffshaozi.data.*
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -44,12 +48,13 @@ fun main() {
 */
 
 object BF1Api {
-    private val okHttpClient = OkHttpClient()
+    val okHttpClient = OkHttpClient()
 
     //服管Api接口
-    fun postApi(body: String, sessionId: String = ""): PostResponse {
+    fun postApi(body: String, sessionId: String = "", isLog: Boolean = true): PostResponse {
         return try {
-            Glogger.info("服管Api请求:${body} SSID:${sessionId}")
+            if (isLog)
+                Glogger.info("服管Api请求:${body} SSID:${sessionId}")
             val request = Request.Builder()
                 .url("https://sparta-gw.battlelog.com/jsonrpc/pc/api")
                 .post(body.toRequestBody("application/json".toMediaType()))
@@ -64,14 +69,15 @@ object BF1Api {
             return if (response.isSuccessful) {
                 val res = response.body?.string()
                 if (res != null) {
-                    if (res.length > 32) Glogger.info(
-                        "服管Api请求成功:${
-                            res.subSequence(
-                                0,
-                                31
-                            )
-                        }"
-                    ) else Glogger.info("服管Api请求成功:${res}")
+                    if (isLog)
+                        if (res.length > 32) Glogger.info(
+                            "服管Api请求成功:${
+                                res.subSequence(
+                                    0,
+                                    31
+                                )
+                            }"
+                        ) else Glogger.info("服管Api请求成功:${res}")
                     PostResponse(isSuccessful = true, reqBody = res)
                 } else {
                     Glogger.error("服管Api请求失败")
@@ -81,15 +87,18 @@ object BF1Api {
             } else {
                 val res = response.body?.string()
                 if (res != null) {
-                    Glogger.error("服管Api请求失败:${res}")
+                    if (isLog)
+                        Glogger.error("服管Api请求失败:${res}")
                     PostResponse(isSuccessful = false, reqBody = res)
                 } else {
-                    Glogger.error("服管Api请求失败")
+                    if (isLog)
+                        Glogger.error("服管Api请求失败")
                     PostResponse(isSuccessful = false, error = "null body")
                 }
             }
         } catch (ex: Exception) {
-            Glogger.error("服管Api请求出错:${ex.stackTraceToString()}")
+            if (isLog)
+                Glogger.error("服管Api请求出错:${ex.stackTraceToString()}")
             PostResponse(isSuccessful = false, error = ex.stackTraceToString())
         }
     }
@@ -147,10 +156,104 @@ object BF1Api {
 
     }
 
+    //BotApi接口
+    fun postBot(
+        groupID: String,
+        url: String = "https://asoul.zj.cn/api/warm/status",
+        isLog: Boolean = true
+    ): PostResponse {
+        return try {
+            if (isLog)
+                Glogger.info("BotApi请求:${groupID}")
+            val request = Request.Builder()
+                .url(url)
+                .post("{\"group\": \"${groupID}\"}".toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = okHttpClient.newCall(request).execute()
+            return if (response.isSuccessful) {
+                val res = response.body?.string()
+                if (res != null) {
+                    if (isLog)
+                        if (res.length > 32) Glogger.info(
+                            "BotApi请求成功:${
+                                res.subSequence(
+                                    0,
+                                    31
+                                )
+                            }"
+                        ) else Glogger.info("BotApi请求成功:${res}")
+                    PostResponse(isSuccessful = true, reqBody = res)
+                } else {
+                    Glogger.error("BotApi请求失败")
+                    PostResponse(isSuccessful = false, error = "null body")
+                }
+
+            } else {
+                val res = response.body?.string()
+                if (res != null) {
+                    if (isLog)
+                        Glogger.error("BotApi请求失败:${res}")
+                    PostResponse(isSuccessful = false, reqBody = res)
+                } else {
+                    if (isLog)
+                        Glogger.error("BotApi请求失败")
+                    PostResponse(isSuccessful = false, error = "null body")
+                }
+            }
+        } catch (ex: Exception) {
+            if (isLog)
+                Glogger.error("BotApi请求出错:${ex.stackTraceToString()}")
+            PostResponse(isSuccessful = false, error = ex.stackTraceToString())
+        }
+    }
+
+    //请求图片
+    fun getImg(url: String, saveName: String, isLog: Boolean): Boolean {
+        val file = File(
+            MiraiConsole.INSTANCE.rootDir.path +
+                    System.getProperty("file.separator") +
+                    "bf1toimg" +
+                    System.getProperty("file.separator")
+                    + "cache"
+                    + System.getProperty("file.separator")
+                    + "${saveName}.png"
+        )
+        if (file.exists()) return true
+        return try {
+            if (isLog)
+                Glogger.info("请求图片:${url}")
+            val request = Request.Builder()
+                .url(url)
+                .build()
+            val response = okHttpClient
+                .newBuilder()
+                .connectTimeout(10, TimeUnit.SECONDS)//设置连接超时时间
+                .readTimeout(5, TimeUnit.SECONDS)//设置读取超时时间
+                .build()
+                .newCall(request).execute()
+            if (response.isSuccessful) {
+                file.outputStream().use { response.body?.byteStream()?.copyTo(it) }
+                if (isLog)
+                    Glogger.info("请求图片成功:${file.name}")
+                true
+            } else {
+                if (isLog)
+                    Glogger.warning("请求图片失败")
+                false
+            }
+        } catch (ex: Exception) {
+            if (isLog)
+                Glogger.error("请求图片出错:${ex.stackTraceToString()}")
+            false
+        }
+    }
+
     //TODO 数据接口类
     //获取数据
-    fun getStats(eaid: String): StatsJson {
-        val response = getApi("https://api.gametools.network/bf1/stats/?format_values=true&name=${eaid}&lang=zh-Tw")
+    fun getStats(eaid: String, isLog: Boolean = true): StatsJson {
+        val response =
+            getApi("https://api.gametools.network/bf1/stats/?format_values=true&name=${eaid}&lang=zh-Tw", isLog)
         return if (response.isSuccessful) {
             //Glogger.info("请求成功转换数据中")
             Gson().fromJson(response.reqBody, StatsJson::class.java).copy(isSuccessful = true)
@@ -158,7 +261,17 @@ object BF1Api {
             StatsJson(isSuccessful = false)
         }
     }
-
+    //获取全部数据
+    fun getAllStats(eaid: String, isLog: Boolean = true): AllStats {
+        val response =
+            getApi("https://api.gametools.network/bf1/all/?format_values=true&name=${eaid}&lang=zh-Tw", isLog)
+        return if (response.isSuccessful) {
+            //Glogger.info("请求成功转换数据中")
+            Gson().fromJson(response.reqBody, AllStats::class.java).copy(isSuccessful = true)
+        } else {
+            AllStats(isSuccessful = false)
+        }
+    }
     //获取武器
     fun getWeapon(eaid: String): WeaponsJson {
         val response =
@@ -229,7 +342,7 @@ object BF1Api {
 
     //最近查询
     fun recentlySearch(eaid: String, isLog: Boolean = true): List<RecentlyJson> {
-        val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}", isLog)
+        val reqBody = getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}", isLog)
         if (!reqBody.isSuccessful) return listOf(RecentlyJson(isSuccessful = false))
         //println(reqBody)
         //document.getElementsByTagName("title")[0].innerHTML
@@ -265,8 +378,9 @@ object BF1Api {
         return ltemp
     }
 
+    //最近对局查询
     fun recentlyServerSearch(eaid: String): MutableSet<RecentlyServerJson> {
-        val reqBody = BF1Api.getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}/matches", false)
+        val reqBody = getApi("https://battlefieldtracker.com/bf1/profile/pc/${eaid}/matches", false)
         val document = Jsoup.parse(reqBody.reqBody)
         val elements = document.getElementsByClass("card matches").iterator()
         val data: MutableSet<RecentlyServerJson> = mutableSetOf()
@@ -283,15 +397,15 @@ object BF1Api {
                             ?.getElementsByClass("title")
                             ?.text()
                             ?.replace("Conquest on ", "[征服]")
-                            ?.replace("BreakthroughLarge0 on","[行动]"),
+                            ?.replace("BreakthroughLarge0 on", "[行动]"),
                         serverName = split?.get(0),
                         time = timeTR(split?.get(1))
                     )
                     val matchUrl = "https://battlefieldtracker.com${it.attr("href")}"
-                    var matchBody = BF1Api.getApi(matchUrl)
+                    var matchBody = getApi(matchUrl)
                     if (!matchBody.isSuccessful) {
                         Thread.sleep(8000)
-                        matchBody = BF1Api.getApi(matchUrl)
+                        matchBody = getApi(matchUrl)
                         if (!matchBody.isSuccessful)
                             return@forEachIndexed
                     }
@@ -480,8 +594,41 @@ object BF1Api {
         return postApi(body, sessionId)
     }
 
+    //切图
+    fun chooseServerVIP(sessionId: String, persistedGameId: String, levelIndex: String): PostResponse {
+        val method = "RSP.chooseLevel"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val persistedGameId = persistedGameId
+                    val levelIndex = levelIndex
+                }
+            )
+        )
+        return postApi(body, sessionId)
+    }
+
+    //换边
+    fun movePlayer(sessionId: String, gameId: String, personaId: Long, teamId: Int): PostResponse {
+        val method = "RSP.movePlayer"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val gameId = gameId
+                    val personaId = personaId
+                    val teamId = teamId
+                }
+            )
+        )
+        return postApi(body, sessionId)
+    }
+
     //获取服务器完整信息
-    fun getFullServerDetails(sessionId: String, gameId: String): FullServerInfoJson {
+    fun getFullServerDetails(sessionId: String, gameId: String, isLog: Boolean = true): FullServerInfoJson {
         val method = "GameServer.getFullServerDetails"
         val body = Gson().toJson(
             jsonrpc(
@@ -492,11 +639,12 @@ object BF1Api {
                 }
             )
         )
-        val postResponse = postApi(body, sessionId)
+        val postResponse = postApi(body, sessionId, isLog)
         return if (postResponse.isSuccessful) {
             Gson().fromJson(postResponse.reqBody, FullServerInfoJson::class.java).copy(isSuccessful = true)
         } else {
             FullServerInfoJson(isSuccessful = false)
         }
     }
+
 }
