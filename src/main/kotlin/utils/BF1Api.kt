@@ -419,7 +419,7 @@ object BF1Api {
         //println(reqBody)
         //document.getElementsByTagName("title")[0].innerHTML
         val document = Jsoup.parse(reqBody.reqBody)
-        val elements = document.html(reqBody.reqBody).getElementsByClass("sessions")
+        val elements = document.getElementsByClass("sessions").iterator()
         val ltemp = mutableListOf<RecentlyJson>()
         elements.forEach a@{
             val date =
@@ -461,7 +461,7 @@ object BF1Api {
                 val next = elements.next()
                 var i = 0
                 next.getElementsByClass("match").forEachIndexed { index, it ->
-                    if (i > 4) return@forEachIndexed
+                    if (i > 2) return@forEachIndexed
                     val details = it.getElementsByClass("details").first()?.getElementsByClass("description")?.text()
                     val split = details?.split(" on ")
                     var temp = RecentlyServerJson(

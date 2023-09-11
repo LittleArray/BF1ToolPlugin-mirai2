@@ -291,9 +291,13 @@ object ServerManagement {
                     player.forEach { (id, team) ->
                         val pid = BF1Api.getPersonaid(id)
                         if (pid.isSuccessful) {
-                            val movePlayer = BF1Api.movePlayer(it.sessionId!!, it.gameID!!, pid.id, if (team == 1) 2 else 1)
-                            if (movePlayer.isSuccessful){
-                                result = "换边成功 $id"
+                            if (Cache.PlayerListInfo[it.gameID!!]?.size == 64) {
+                                result = "换个锤子,人满了"
+                            }else{
+                                val movePlayer = BF1Api.movePlayer(it.sessionId!!, it.gameID!!, pid.id, if (team == 1) 2 else 1)
+                                if (movePlayer.isSuccessful){
+                                    result = "换边..成功了吗?如换 $id"
+                                }
                             }
                         }
                     }

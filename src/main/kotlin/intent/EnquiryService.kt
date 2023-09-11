@@ -47,30 +47,176 @@ object EnquiryService {
         }
         //查询
         Intent.sendMsg(I, CustomerLang.searching.replace("//id//", id).replace("//action//", "基础数据"))
-        val tempStatsJson = BF1Api.getStats(id)
-        return if (tempStatsJson.isSuccessful) {
-            PlainText(
-                """
-                            ID:${tempStatsJson.userName} 
-                            Lv.${tempStatsJson.rank} 经验条:${tempStatsJson.currentRankProgress.toFloat() / tempStatsJson.totalRankProgress.toFloat() * 100}%
-                            PID:${tempStatsJson.id}
-                            KPM:${tempStatsJson.killsPerMinute} SPM:${tempStatsJson.scorePerMinute} 
-                            KD:${tempStatsJson.killDeath} 胜率:${tempStatsJson.winPercent}
-                            死亡:${tempStatsJson.deaths} 击杀:${tempStatsJson.kills}
-                            扎人数:${tempStatsJson.revives} 治疗数:${tempStatsJson.heals}
-                            修理数:${tempStatsJson.repairs} 狗牌数:${tempStatsJson.dogtagsTaken}
-                            复仇数:${tempStatsJson.avengerKills} 协助击杀:${tempStatsJson.killAssists}
-                            命中率:${tempStatsJson.accuracy} 爆头率:${tempStatsJson.headshots}
-                            技巧值:${tempStatsJson.skill}
-                            最远击杀距离:${tempStatsJson.longestHeadShot}m
-                            最高连续击杀:${tempStatsJson.highestKillStreak}
-                            游玩时长:${tempStatsJson.secondsPlayed.toInt() / 60 / 60}h
-                            最佳兵种:${tempStatsJson.bestClass}
-                        """.trimIndent()
-            )
+        val name = id
+        val allStats = BF1Api.getAllStats(name)
+        if (allStats.isSuccessful) {
+            val htmlToImage = HtmlToImage()
+            val content = htmlToImage.readIt("stats")
+            var res = content
+                .replace("-DNAME", name)
+                .replace("-DRANK", allStats.rank.toString())
+                .replace("-DCPRO", allStats.currentRankProgress.toString())
+                .replace("-DTPRO", allStats.totalRankProgress.toString())
+                .replace("-DGTIME", "${allStats.secondsPlayed?.div(60)?.div(60)}")
+                .replace("-DBEST", "${allStats.bestClass}")
+                .replace(
+                    "-DKILLS",
+                    if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
+                )
+                .replace(
+                    "-DDEATH",
+                    if (allStats.deaths != null && allStats.deaths > 10000) "${allStats.deaths.div(100)} ★" else "${allStats.deaths}"
+                )
+                .replace("-DLKD", "${allStats.killDeath}")
+                .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace("-DREVIVES", "${allStats.revives}")
+                .replace("-DHEALS", "${allStats.heals}")
+                .replace("-Drepairs", "${allStats.repairs}")
+                .replace("-DdogtagsTaken", "${allStats.dogtagsTaken}")
+                .replace("-DavengerKills", "${allStats.avengerKills}")
+                .replace("-Dskill", "${allStats.skill}")
+                .replace("-Daccuracy", "${allStats.accuracy}")
+                .replace("-Dheadshots", "${allStats.headshots}")
+                .replace("-DkillAssists", "${allStats.killAssists}")
+                .replace("-DhighestKillStreak", "${allStats.highestKillStreak}")
+                .replace("-DlongestHeadShotm", "${allStats.longestHeadShot}")
+            if (allStats.activePlatoon != null) {
+                if (allStats.activePlatoon.emblem != null && allStats.activePlatoon.tag != null) {
+                    val cacheImg =
+                        htmlToImage.cacheImg(allStats.activePlatoon.emblem, "Platoon_${allStats.activePlatoon.tag}")
+                    res = if (cacheImg) {
+                        res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("-DPO", allStats.activePlatoon.tag)
+                    } else {
+                        htmlToImage.cacheImg(allStats.activePlatoon.emblem, "Avatar_Def")
+                        res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("-DPO", allStats.activePlatoon.tag)
+                    }
+                } else {
+                    //头像缓存
+                    if (allStats.avatar != null) {
+                        val cacheImg = htmlToImage.cacheImg(allStats.avatar, "Avatar_${name}")
+                        res = if (cacheImg) {
+                            res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("[-DPO]", "")
+                        } else {
+                            htmlToImage.cacheImg(allStats.avatar, "Avatar_Def")
+                            res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("[-DPO]", "")
+                        }
+                    }
+                }
+            }
+            val wpModel = """
+            <div class="item">
+                <p>NAME</p>
+                <img src="IMG">
+                <span>
+                    <p>擊殺:KILLS</p>
+                    <p>KPM:-DKPM</p>
+                    <p>效率:-DVP</p>
+                </span>
+                <span>
+                    <p>精确率:-DAC</p>
+                    <p>爆头率:-DHS</p>
+                    <p>时长:-DTPh</p>
+                </span>
+            </div>
+        """.trimIndent()
+            val vpModel = """
+            <div class="item">
+                <p>NAME</p>
+                <img src="IMG">
+                <span>
+                    <p>擊殺:KILLS</p>
+                    <p>KPM:-DKPM</p>
+                    <p>摧毁:-DS</p>
+                </span>
+                <p>时长:-DTPh</p>
+            </div>
+        """.trimIndent()
+            val classModel ="""
+                <span>
+                    <img src="IMG" style="height: 16px;">
+                    <p>Name</p>
+                    <p>K:kills</p>
+                    <p>KPM:kpms</p>
+                    <p>T:timePlayh</p>
+                </span>
+            """.trimIndent()
+            var wpText = ""
+            var classText = ""
+            var vpText = ""
+            allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEachIndexed { index, weapon ->
+                if (index < 3) {
+                    htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
+                    wpText += wpModel
+                        .replace("KILLS", if (weapon.kills > 1000) "${weapon.kills.div(100)} ★" else "${weapon.kills}")
+                        .replace("NAME", weapon.weaponName)
+                        .replace("-DKPM", weapon.killsPerMinute.toString())
+                        .replace("-DVP", weapon.hitVKills.toString())
+                        .replace("-DAC", weapon.accuracy)
+                        .replace("-DHS", weapon.headshots)
+                        .replace("-DTP", "${weapon.timeEquipped / 60 / 60}")
+                        .replace("IMG", htmlToImage.getImgPath())
+                }
+            }
+            allStats.vehicles?.sortedByDescending { vehicles -> vehicles.kills }?.forEachIndexed { index, vehicles ->
+                if (index < 3) {
+                    htmlToImage.cacheImg(vehicles.image, "Vehicles_${vehicles.vehicleName}")
+                    vpText += vpModel
+                        .replace(
+                            "KILLS",
+                            if (vehicles.kills > 1000) "${vehicles.kills.div(100)} ★" else "${vehicles.kills}"
+                        )
+                        .replace("NAME", vehicles.vehicleName)
+                        .replace("-DKPM", vehicles.killsPerMinute.toString())
+                        .replace("-DS", vehicles.destroyed.toString())
+                        .replace("-DTP", "${vehicles.timeIn / 60 / 60}")
+                        .replace("IMG", htmlToImage.getImgPath())
+                }
+            }
+            allStats.classes?.forEachIndexed { index, classes ->
+                htmlToImage.cacheImg(classes.image, "Class_${classes.className}")
+                classText += classModel
+                    .replace("IMG",htmlToImage.getImgPath())
+                    .replace("Name",classes.className)
+                    .replace("kpms",classes.kpm.toString())
+                    .replace("kills",if (classes.kills > 1000) "${classes.kills.div(100)} ★" else "${classes.kills}")
+                    .replace("timePlay", "${classes.secondsPlayed / 60 / 60}")
+            }
+            res = res.replace("WPTEXT", wpText).replace("VPTEXT", vpText).replace("CLTEXT",classText)
+            var eacState = "無記錄"
+            val eacInfoJson = BF1Api.searchBFEAC(name)
+            if (eacInfoJson.error_code == 0) {
+                if (!eacInfoJson.data.isNullOrEmpty()) {
+                    eacState = when (eacInfoJson.data[0].current_status) {
+                        0 -> "有记录但未处理\ncase/${eacInfoJson.data[0].case_id}"
+                        1 -> "判定为石锤\ncase/${eacInfoJson.data[0].case_id}"
+                        2 -> "判定为证据不足\ncase/${eacInfoJson.data[0].case_id}"
+                        3 -> "判定为自证通过\ncase/${eacInfoJson.data[0].case_id}"
+                        4 -> "判定为自证中\ncase/${eacInfoJson.data[0].case_id}"
+                        5 -> "判定为刷枪\ncase/${eacInfoJson.data[0].case_id}"
+                        else -> "未知判定\ncase/${eacInfoJson.data[0].case_id}"
+                    }
+                }
+            }
+            res = res.replace("-DeacState", eacState)
+            val recentlyJson = BF1Api.recentlySearch(name)
+            if (recentlyJson.isNotEmpty()) {
+                res = res
+                    .replace("-Dre_time", recentlyJson[0].rp)
+                    .replace("-Dre_pt", recentlyJson[0].tp)
+                    .replace("-Dre_spm", recentlyJson[0].spm)
+                    .replace("-Dre_kpm", recentlyJson[0].kpm)
+                    .replace("-Dre_kd", recentlyJson[0].kd)
+            }
 
+            htmlToImage.writeTempFile(res)
+            htmlToImage.toImage(1280, 720)
+            CoroutineScope(Dispatchers.IO).launch {
+                I.event.subject.sendImage(File(htmlToImage.getFilePath()))
+                htmlToImage.removeIt()
+            }
+            return "OK".toPlainText()
         } else {
-            PlainText(CustomerLang.searchErr.replace("//action//", "基础数据"))
+            return PlainText(CustomerLang.searchErr.replace("//action//", "基础数据"))
         }
     }
 
@@ -89,13 +235,13 @@ object EnquiryService {
         if (eacInfoJson.error_code != 0) return PlainText(CustomerLang.nullEac.replace("//id//", id))
         if (eacInfoJson.data.isNullOrEmpty()) return PlainText(CustomerLang.nullEac.replace("//id//", id))
         return when (eacInfoJson.data[0].current_status) {
-            0 -> PlainText("ID:${eacInfoJson.data[0].current_name}有记录但未处理\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            1 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为石锤\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            2 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为证据不足\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            3 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证通过\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            4 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为自证中\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            5 -> PlainText("ID:${eacInfoJson.data[0].current_name}判定为刷枪\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
-            else -> PlainText("ID:${eacInfoJson.data[0].current_name}未知判定\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            0 -> PlainText("有记录但未处理\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            1 -> PlainText("判定为石锤\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            2 -> PlainText("判定为证据不足\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            3 -> PlainText("判定为自证通过\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            4 -> PlainText("判定为自证中\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            5 -> PlainText("判定为刷枪\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
+            else -> PlainText("未知判定\nLink:https://www.bfeac.com/?#/case/${eacInfoJson.data[0].case_id}")
         }
     }
 
@@ -178,6 +324,7 @@ object EnquiryService {
                             爆头率:${it.headshots}
                             命中率:${it.accuracy}
                             KPM:${it.killsPerMinute}
+                            效率:${it.hitVKills}
                             时长:${it.timeEquipped / 60 / 60}h
                             类型:${it.type}
                                             """.trimIndent()
@@ -198,6 +345,7 @@ object EnquiryService {
                             爆头率:${it.headshots}
                             命中率:${it.accuracy}
                             KPM:${it.killsPerMinute}
+                            效率:${it.hitVKills}
                             时长:${it.timeEquipped / 60 / 60}h
                             类型:${it.type}
                                             """.trimIndent()
@@ -325,10 +473,11 @@ object EnquiryService {
                     var teamTwo = ""
                     var teamTwoName = ""
                     var team2Index = 0
-                    val text = readIt("playerList")
+                    val htmlToImage = HtmlToImage()
+                    val text = htmlToImage.readIt("playerList")
                     //background-color: rgb(86, 196, 73);
                     val player =
-                        "<div class=\"player\"><div class=\"index\">INDEX</div><div class=\"rank\"  style=\"rankback\">RANK</div><div style=\"color: #fff;id\" class=\"name\">NAME</div><div style=\"color: #fff;lkd\" class=\"lifeKD\">LIFE_KD</div><div style=\"color: #fff;lkp\" class=\"lifeKPM\">LIFE_KPM</div><div style=\"color: #fff;rkd\" class=\"RKD\">R_KD</div><div style=\"color: #fff;rkp\" class=\"RKPM\">R_KPM</div><div class=\"time\">TIME分</div><div class=\"latency\">PINGms</div></div>"
+                        "<div class=\"player\"><div class=\"index\">INDEX</div><div class=\"rank\"  style=\"rankback\">RANK</div><div class=\"black\">BLACK_TEXT</div><div style=\"color: #fff;id\" class=\"name\">NAME</div><div style=\"color: #fff;lkd\" class=\"lifeKD\">LIFE_KD</div><div style=\"color: #fff;lkp\" class=\"lifeKPM\">LIFE_KPM</div><div style=\"color: #fff;rkd\" class=\"RKD\">R_KD</div><div style=\"color: #fff;rkp\" class=\"RKPM\">R_KPM</div><div class=\"time\">TIME分</div><div class=\"latency\">PINGms</div></div>"
                     val platoonSet: MutableSet<String> = mutableSetOf()
                     val blackTeamSet: MutableSet<String> = mutableSetOf()
                     Cache.PlayerListInfo.forEach { gameID, players ->
@@ -353,6 +502,7 @@ object EnquiryService {
                                     pa = "[ ${it.platoon} ] "
 
                                 var color = "#fff"
+                                var blackText = ""
                                 var colorlkd = "#fff"
                                 var colorlkp = "#fff"
                                 var colorrkp = "#fff"
@@ -371,14 +521,14 @@ object EnquiryService {
                                 }
                                 blackTeamSet.forEach { pa ->
                                     if (it.platoon == pa) {
-                                        if (!it.isBot){
-                                            color = "chartreuse"
+                                        if (!it.isBot) {
+                                            blackText = "[!]"
                                             blackPlayer++
                                         }
                                     }
                                 }
                                 Setting.groupData[groupid]?.bindingData?.forEach {
-                                    if (it.value.indexOf(id,0,true) !=-1) {
+                                    if (it.value.indexOf(id, 0, true) != -1) {
                                         color = "pink"
                                         groupPlayer++
                                     }
@@ -386,7 +536,7 @@ object EnquiryService {
                                 run o@{
                                     Setting.groupData[groupid]?.bindingData?.forEach {
                                         Setting.groupData[groupid]?.operator?.forEach { qq ->
-                                            if (it.key == qq && it.value.indexOf(id,0,true) !=-1) {
+                                            if (it.key == qq && it.value.indexOf(id, 0, true) != -1) {
                                                 color = "#f9767b"
                                                 opPlayer++
                                                 return@o
@@ -410,12 +560,16 @@ object EnquiryService {
                                         .replace("LIFE_KPM", "${it.lkp}")
                                         .replace("R_KD", "${it.rkd}")
                                         .replace("R_KPM", "${it.rkp}")
+                                        .replace("BLACK_TEXT", blackText)
                                         .replace("color: #fff;id", "color: ${color};")
                                         .replace("color: #fff;lkd", "color: ${colorlkd};")
                                         .replace("color: #fff;lkp", "color: ${colorlkp};")
                                         .replace("color: #fff;rkp", "color: ${colorrkp};")
                                         .replace("color: #fff;rkd", "color: ${colorrkd};")
-                                        .replace("rankback",if (it.rank >120)"background-color: rgb(86, 196, 73);" else "")
+                                        .replace(
+                                            "rankback",
+                                            if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
+                                        )
                                 } else {
                                     teamTwoName = it.team
                                     team2Index++
@@ -432,12 +586,16 @@ object EnquiryService {
                                         .replace("LIFE_KPM", "${it.lkp}")
                                         .replace("R_KD", "${it.rkd}")
                                         .replace("R_KPM", "${it.rkp}")
+                                        .replace("BLACK_TEXT", blackText)
                                         .replace("color: #fff;id", "color: ${color};")
                                         .replace("color: #fff;lkd", "color: ${colorlkd};")
                                         .replace("color: #fff;lkp", "color: ${colorlkp};")
                                         .replace("color: #fff;rkp", "color: ${colorrkp};")
                                         .replace("color: #fff;rkd", "color: ${colorrkd};")
-                                        .replace("rankback",if (it.rank >120)"background-color: rgb(86, 196, 73);" else "")
+                                        .replace(
+                                            "rankback",
+                                            if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
+                                        )
                                 }
                             }
                     }
@@ -451,16 +609,19 @@ object EnquiryService {
                         if (Cache.ServerInfoList[gameid]!!.mode == it.key)
                             modeName = it.value
                     }
-                    val tOimg = teamOneName.replace(" ","_")
-                    val tTimg = teamTwoName.replace(" ","_")
-                    var teamOneImg = ""
-                    var teamTwoImg = ""
-                    if (BF1Api.getImg(Cache.ServerInfoList[gameid]!!.teamOneImgUrl,tOimg,true)) {
-                        teamOneImg = getImgPath(tOimg)
-                    }
-                    if (BF1Api.getImg(Cache.ServerInfoList[gameid]!!.teamTwoImgUrl,tTimg,true)) {
-                        teamTwoImg = getImgPath(tTimg)
-                    }
+
+                    val teamOneImg =
+                        if (htmlToImage.cacheImg(Cache.ServerInfoList[gameid]!!.teamOneImgUrl, teamOneName)) {
+                            htmlToImage.getImgPath()
+                        } else {
+                            ""
+                        }
+                    val teamTwoImg =
+                        if (htmlToImage.cacheImg(Cache.ServerInfoList[gameid]!!.teamTwoImgUrl, teamTwoName)) {
+                            htmlToImage.getImgPath()
+                        } else {
+                            ""
+                        }
                     val res = text
                         .replace("Team1Replace", teamOne)
                         .replace("Team2Replace", teamTwo)
@@ -470,7 +631,10 @@ object EnquiryService {
                         .replace("-DMODE", modeName)
                         .replace("-DMAP", mapName)
                         .replace("-DMP_back", Cache.ServerInfoList[gameid]!!.map)
-                        .replace("-DTIME", SimpleDateFormat("MM-dd HH:mm:ss").format(Cache.ServerInfoList[gameid]!!.cacheTime))
+                        .replace(
+                            "-DTIME",
+                            SimpleDateFormat("MM-dd HH:mm:ss").format(Cache.ServerInfoList[gameid]!!.cacheTime)
+                        )
                         .replace("-DLBPL", Cache.ServerInfoList[gameid]!!.oldPlayers.toString())
                         .replace("-DBOPL", Cache.ServerInfoList[gameid]!!.bots.toString())
                         .replace("-DGOPL", groupPlayer.toString())
@@ -483,10 +647,11 @@ object EnquiryService {
                         .replace("-DGameID", gameid)
                         .replace("-DGameID", gameid)
 
-                    writeTempFile("playerList", res)
-                    htmlToImage("playerList")
+                    htmlToImage.writeTempFile(res)
+                    htmlToImage.toImage()
                     CoroutineScope(Dispatchers.IO).launch {
-                        I.event.subject.sendImage(File(getFilePath("playerList")))
+                        I.event.subject.sendImage(File(htmlToImage.getFilePath()))
+                        htmlToImage.removeIt()
                     }
                 }
             }

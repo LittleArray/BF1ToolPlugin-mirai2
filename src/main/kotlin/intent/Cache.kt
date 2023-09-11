@@ -35,7 +35,7 @@ object Cache {
     var ServerManageThreadPool: HashMap<Long, Boolean> = hashMapOf()
 
     //临时服务器玩家数据
-    var PlayerListInfo: HashMap<String, HashMap<String, Player>> = hashMapOf()
+    var PlayerListInfo: HashMap<String, HashMap<String, ServerInfo.Player>> = hashMapOf()
 
     //临时服务器数据
     var ServerInfoList: HashMap<String, ServerInfo> = hashMapOf()
@@ -72,6 +72,7 @@ object Cache {
         "MP_Offensive" to "索姆河",
         "MP_ShovelTown" to "尼维尔之夜",
         "MP_Bridge" to "勃鲁西洛夫关口",
+        "MP_Scar" to "圣康坦的伤痕",
     )
 
     /**
@@ -103,23 +104,23 @@ object Cache {
         var loadingPlayers: Int = 0,
         val cacheTime: Date,
         val zeroTime:Int = 0,
-    )
-
-    data class Player(
-        var team: String,
-        var teamId: Int,
-        var rank: Int,
-        var pid: Long = 0L,
-        var platoon: String = "",
-        var join_time: Long,
-        var latency: Int,
-        var isBot: Boolean = false,
-        var botState: String = "",
-        var lkd: Float = 0f,
-        var lkp: Float = 0f,
-        var rkd: Float = 0f,
-        var rkp: Float = 0f,
-    )
+    ){
+        data class Player(
+            var team: String,
+            var teamId: Int,
+            var rank: Int,
+            var pid: Long = 0L,
+            var platoon: String = "",
+            var join_time: Long,
+            var latency: Int,
+            var isBot: Boolean = false,
+            var botState: String = "",
+            var lkd: Float = 0f,
+            var lkp: Float = 0f,
+            var rkd: Float = 0f,
+            var rkp: Float = 0f,
+        )
+    }
 
     /**
      * 刷新服务器玩家列表
@@ -141,7 +142,7 @@ object Cache {
                 botsJson = Gson().fromJson(bot.reqBody, BotsJson::class.java)
             }
         }
-        val temp: HashMap<String, Player> = hashMapOf()
+        val temp: HashMap<String, ServerInfo.Player> = hashMapOf()
         val tempCacheLife: MutableSet<String> = mutableSetOf()
         var tempServerInfo: ServerInfo? =
             list.serverinfo?.let {
@@ -175,7 +176,7 @@ object Cache {
                 when (team.teamid) {
                     "teamOne" -> {
                         temp[player.name] =
-                            Player(
+                            ServerInfo.Player(
                                 team = team.name,
                                 teamId = 1,
                                 rank = player.rank,
@@ -189,7 +190,7 @@ object Cache {
 
                     "teamTwo" -> {
                         temp[player.name] =
-                            Player(
+                            ServerInfo.Player(
                                 team = team.name,
                                 teamId = 2,
                                 rank = player.rank,

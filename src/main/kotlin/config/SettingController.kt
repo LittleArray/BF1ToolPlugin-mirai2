@@ -159,7 +159,7 @@ object SettingController {
                 if (recentlyMaxKPM > 0)
                     it.recentlyMaxKPM = recentlyMaxKPM
                 if (recentlyMaxKD > 0)
-                    it.lifeMaxKD = recentlyMaxKD
+                    it.recentlyMaxKD = recentlyMaxKD
             }
         }
         return true

@@ -57,13 +57,13 @@ data class AllStats(
 ) {
 
     data class ActivePlatoon(
-        val description: String,
-        val emblem: String,
-        val id: String,
-        val name: String,
-        val tag: String,
-        val type: String,
-        val url: String
+        val description: String?=null,
+        val emblem: String?=null,
+        val id: String?=null,
+        val name: String?=null,
+        val tag: String?=null,
+        val type: String?=null,
+        val url: String?=null
     )
 
     data class Classe(

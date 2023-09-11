@@ -1,22 +1,19 @@
 package top.ffshaozi.intent
 
-import data.KickLogPost
 import data.MultiCheckPostJson
 import data.MultiCheckResponse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.BF1ToolPlugin
 import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
+import top.ffshaozi.config.Setting.groupData
 import top.ffshaozi.intent.Intent.sendMsg
 import top.ffshaozi.utils.BF1Api
 import top.ffshaozi.utils.BF1Api.getPersonaid
 import top.ffshaozi.utils.BF1Api.getStats
 import top.ffshaozi.utils.BF1Api.kickPlayer
-import top.ffshaozi.utils.BF1Api.postEacApi
 import top.ffshaozi.utils.BF1Api.recentlySearch
 import top.ffshaozi.utils.BF1Api.searchBFEAC
 import top.ffshaozi.utils.BF1Api.searchBFEACByPid
@@ -29,9 +26,7 @@ import top.ffshaozi.utils.BF1Api.searchBFEACByPid
 object CycleTask {
 
     fun serverManageRefresh(I: PullIntent): Message {
-        serverEACR(I)
         serverPlayerR(I)
-        serverRKDR(I)
         serverPlayerDataR(I)
         serverListR(I)
         return if (Cache.ServerManageThreadPool[I.event.group.id] == null || Cache.ServerManageThreadPool[I.event.group.id] == false) {
@@ -60,6 +55,7 @@ object CycleTask {
                             )
                         }
                     }
+                    serverEAC(I)
                     BF1ToolPlugin.Glogger.info("服务器列表更新线程")
                     Thread.sleep(25 * 1000)
                 }
@@ -71,61 +67,51 @@ object CycleTask {
     }
 
     //Thread - BFEAC检测(缓存算法)
-    fun serverEACR(I: PullIntent) {
-        if (Cache.EACThreadPool[I.event.group.id]?.isAlive == null || Cache.EACThreadPool[I.event.group.id]?.isAlive == false) {
-            Cache.EACThreadPool[I.event.group.id] = Thread {
-                while (true) {
-                    serverInfoIterator { groupID, data, index, serverInfoForSave ->
-                        run p@{
-                            if (groupID != I.event.group.id) return@p
-                            val cacheBan: MultiCheckResponse
-                            val cacheList = MultiCheckPostJson()
-                            Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, data) ->
-                                var isKick = false
-                                Cache.KickPlayers.forEach {
-                                    if (it == name) isKick = true
-                                }
-                                if (!isKick)
-                                    cacheList.pids.add(data.pid)
-                            }
-                            if (cacheList.pids.size == 0) return@p
-                            cacheBan = searchBFEAC(cacheList, true)
-                            cacheBan.data.forEach {
-                                var name = ""
-                                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (id, data) ->
-                                    if (data.pid == it) name = id
-                                }
-                                val kickPlayer = kickPlayer(
-                                    serverInfoForSave.sessionId!!,
-                                    serverInfoForSave.gameID!!,
-                                    it.toString(),
-                                    "掛鉤給老子滾 BFEAC BAN"
-                                )
-                                if (!kickPlayer.isSuccessful) {
-                                    sendMsg(
-                                        I,
-                                        "挂钩${name}在${index}服上市了失败\n${kickPlayer.reqBody}"
-                                    )
-                                } else {
-                                    val case_id = searchBFEACByPid(it.toString(), true).data?.case_id
-                                    sendMsg(
-                                        I,
-                                        "挂钩${name}在${index}服被狠狠上市了\nhttps://www.bfeac.com/?#/case/$case_id"
-                                    )
-
-                                    Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
-                                    Cache.KickPlayers.add(name)
-                                }
-                            }
-                        }
+    fun serverEAC(I: PullIntent) {
+        BF1ToolPlugin.Glogger.info("挂钩开踹")
+        serverInfoIterator { groupID, data, index, serverInfoForSave ->
+            run p@{
+                if (groupID != I.event.group.id) return@p
+                val cacheBan: MultiCheckResponse
+                val cacheList = MultiCheckPostJson()
+                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, data) ->
+                    var isKick = false
+                    Cache.KickPlayers.forEach {
+                        if (it == name) isKick = true
                     }
-                    BF1ToolPlugin.Glogger.info("BFEAC检测")
-                    Thread.sleep(30 * 1000)
+                    if (!isKick)
+                        cacheList.pids.add(data.pid)
+                }
+                if (cacheList.pids.size == 0) return@p
+                cacheBan = searchBFEAC(cacheList, false)
+                cacheBan.data.forEach {
+                    var name = ""
+                    Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (id, data) ->
+                        if (data.pid == it) name = id
+                    }
+                    val kickPlayer = kickPlayer(
+                        serverInfoForSave.sessionId!!,
+                        serverInfoForSave.gameID!!,
+                        it.toString(),
+                        "掛鉤給老子滾 BFEAC BAN"
+                    )
+                    if (!kickPlayer.isSuccessful) {
+                        sendMsg(
+                            I,
+                            "挂钩${name}在${index}服上市了失败\n${kickPlayer.reqBody}"
+                        )
+                    } else {
+                        val case_id = searchBFEACByPid(it.toString(), false).data?.case_id
+                        sendMsg(
+                            I,
+                            "挂钩${name}在${index}服被狠狠上市了\nhttps://www.bfeac.com/?#/case/$case_id"
+                        )
+                        BF1ToolPlugin.Glogger.error("挂钩${name}在${index}服被狠狠上市了 https://www.bfeac.com/?#/case/$case_id")
+                        Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
+                        Cache.KickPlayers.add(name)
+                    }
                 }
             }
-            Cache.EACThreadPool[I.event.group.id]?.start()
-        } else {
-            Cache.EACThreadPool[I.event.group.id]?.stop()
         }
     }
 
@@ -162,7 +148,7 @@ object CycleTask {
                                     players[gameID] = player
                                     return@p
                                 }
-                                if (player < 32) {
+                                if (player < 45) {
                                     if (player < players[gameID]!!) {
                                         sendMsg(
                                             I, """
@@ -207,132 +193,121 @@ object CycleTask {
         }
     }
 
-    //Thread - 踢人线程
-    fun serverRKDR(I: PullIntent) {
-        if (Cache.RPDataThreadPool[I.event.group.id]?.isAlive == null || Cache.RPDataThreadPool[I.event.group.id]?.isAlive == false) {
-            Cache.RPDataThreadPool[I.event.group.id] = Thread {
-                while (true) {
-                    serverInfoIterator { groupID, data, serverCount, serverInfoForSave ->
-                        run p@{
-                            if (groupID != I.event.group.id) return@p
-                            Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, plData) ->
-                                if (!serverInfoForSave.isEnableAutoKick) return@p
-                                Cache.KickPlayers.forEach {
-                                    if (name == it) return@p
-                                }
-                                var isWhite = false
-                                data.recentlyTempWhitelist.forEach {
-                                    if (it == name) {
-                                        isWhite = true
-                                    }
-                                }
-                                if (plData.isBot) {
-                                    isWhite = true
-                                }
-                                Cache.cacheLife.forEach { if (it == name) isWhite = true }
-                                if (isWhite) return@p
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    run c@{
-                                        if (plData.lkd > serverInfoForSave.lifeMaxKD ||
-                                            plData.lkp > serverInfoForSave.lifeMaxKPM ||
-                                            plData.rkp > serverInfoForSave.recentlyMaxKPM ||
-                                            plData.rkd > serverInfoForSave.recentlyMaxKD
-                                        ) {
-                                            sendMsg(
-                                                I,
-                                                "${name}这个老逼登想在${serverCount}服偷吃薯条,尝试踢出\n最近KD:${plData.rkd} 最近KPM:${plData.rkp} 生涯KD:${plData.lkd} 生涯KPM:${plData.rkp}"
-                                            )
-                                            val pid = getPersonaid(name)
-                                            val kickPlayer = kickPlayer(
-                                                serverInfoForSave.sessionId!!,
-                                                serverInfoForSave.gameID!!,
-                                                pid.id.toString(),
-                                                "KD/KPM Limited"
-                                            )
-                                            if (!kickPlayer.isSuccessful) {
-                                                sendMsg(
-                                                    I,
-                                                    "${name}还在${serverCount}服偷吃薯条,踢出失败\n${kickPlayer.reqBody}"
-                                                )
-                                            } else {
-                                                Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
-                                                Cache.KickPlayers.add(name)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+
+    /*    //Thread - 踢人线程
+        fun serverRKDR(I: PullIntent) {
+            if (Cache.RPDataThreadPool[I.event.group.id]?.isAlive == null || Cache.RPDataThreadPool[I.event.group.id]?.isAlive == false) {
+                Cache.RPDataThreadPool[I.event.group.id] = Thread {
+                    while (true) {
+
+                        BF1ToolPlugin.Glogger.info("踢人线程")
+                        Thread.sleep(30 * 1000)
                     }
-                    BF1ToolPlugin.Glogger.info("踢人线程")
-                    Thread.sleep(30 * 1000)
                 }
+                Cache.RPDataThreadPool[I.event.group.id]?.start()
+            } else {
+                Cache.RPDataThreadPool[I.event.group.id]?.stop()
             }
-            Cache.RPDataThreadPool[I.event.group.id]?.start()
-        } else {
-            Cache.RPDataThreadPool[I.event.group.id]?.stop()
-        }
-    }
+        }*/
 
     //Thread - 玩家数据检测(缓存算法)
     fun serverPlayerDataR(I: PullIntent) {
         if (Cache.PlayerDataThreadPool[I.event.group.id]?.isAlive == null || Cache.PlayerDataThreadPool[I.event.group.id]?.isAlive == false) {
             Cache.PlayerDataThreadPool[I.event.group.id] = Thread {
-
                 while (true) {
                     var btrIsErr = false
-                    serverInfoIterator { groupID, data, serverCount, serverInfoForSave ->
-                        run p@{
-                            if (groupID != I.event.group.id) return@p
-                            if (Cache.cacheLife.size > 300) Cache.cacheLife = mutableSetOf()
-                            Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, plData) ->
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    var rkd = 0f
-                                    var rkpm = 0f
-                                    var lkd: Float
-                                    var lkpm: Float
-                                    run c@{
-                                        //生涯检测
-                                        val stats = getStats(name, false)
-                                        lkd = stats.killDeath.toFloat()
-                                        lkpm = stats.killsPerMinute.toFloat()
-                                        if (plData.rank == 0) plData.rank = stats.rank
-                                        if (plData.pid == 0L) plData.pid = stats.id
-                                        if (lkd > 0 && lkpm > 0 && plData.pid > 0 && plData.rank!=0) {
-                                            Cache.cacheLife.add(name)
-                                        }
-                                        //最近数据检测
-                                        val recentlyJson = recentlySearch(name, false)
-                                        if (recentlyJson.isNotEmpty()) {
-                                            run fe@{
-                                                recentlyJson.forEachIndexed { index2, it ->
-                                                    if (index2 > 2) return@fe
-                                                    if (it.isSuccessful) {
-                                                        if (it.tp.isNotEmpty()) {
-                                                            val sp = it.tp.split(" ")
-                                                            if (sp.size > 1 || sp[0].replace("m", "").toInt() > 30) {
-                                                                rkd = it.kd.toFloat()
-                                                                rkpm = it.kpm.toFloat()
+                    val tempCo = mutableListOf<Job>()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        serverInfoIterator { groupID, data, serverCount, serverInfoForSave ->
+                            run p@{
+                                if (groupID != I.event.group.id) return@p
+                                if (Cache.cacheLife.size > 300) Cache.cacheLife = mutableSetOf()
+                                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, plData) ->
+                                    tempCo.add(launch {
+                                        var rkd = 0f
+                                        var rkpm = 0f
+                                        var lkd: Float
+                                        var lkpm: Float
+                                        run c@{
+                                            //生涯检测
+                                            val stats = getStats(name, false)
+                                            lkd = stats.killDeath.toFloat()
+                                            lkpm = stats.killsPerMinute.toFloat()
+                                            if (plData.rank == 0) plData.rank = stats.rank
+                                            if (plData.pid == 0L) plData.pid = stats.id
+                                            if (lkd > 0 && lkpm > 0 && plData.pid > 0 && plData.rank != 0) {
+                                                Cache.cacheLife.add(name)
+                                            }
+                                            //最近数据检测
+                                            val recentlyJson = recentlySearch(name, false)
+                                            if (recentlyJson.isNotEmpty()) {
+                                                run fe@{
+                                                    recentlyJson.forEachIndexed { index2, it ->
+                                                        if (index2 > 2) return@fe
+                                                        if (it.isSuccessful) {
+                                                            if (it.tp.isNotEmpty()) {
+                                                                val sp = it.tp.split(" ")
+                                                                if (sp.size > 1 || sp[0].replace("m", "").toInt() > 30
+                                                                ) {
+                                                                    rkd = it.kd.toFloat()
+                                                                    rkpm = it.kpm.toFloat()
+                                                                    return@fe
+                                                                }
+                                                            } else {
+                                                                btrIsErr = true
                                                             }
-                                                        } else {
-                                                            btrIsErr = true
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if (lkd > 0 && lkpm > 0) {
+                                                Cache.PlayerListInfo[serverInfoForSave.gameID]!![name] = plData.copy(lkd = lkd, lkp = lkpm, rkd = rkd, rkp = rkpm)
+                                                if (lkd > serverInfoForSave.lifeMaxKD ||
+                                                    lkpm > serverInfoForSave.lifeMaxKPM ||
+                                                    rkpm > serverInfoForSave.recentlyMaxKPM ||
+                                                    rkd > serverInfoForSave.recentlyMaxKD
+                                                ) {
+                                                    if (!plData.isBot){
+                                                        if (serverInfoForSave.isEnableAutoKick) {
+                                                            var isW = false
+                                                            groupData[I.event.group.id]?.recentlyTempWhitelist?.forEach {
+                                                                if (name == it) isW=true
+                                                            }
+                                                            if (!isW){
+                                                                val pid = getPersonaid(name)
+                                                                val kickPlayer = kickPlayer(
+                                                                    serverInfoForSave.sessionId!!,
+                                                                    serverInfoForSave.gameID!!,
+                                                                    pid.id.toString(),
+                                                                    "KD/KPM Limited"
+                                                                )
+                                                                if (!kickPlayer.isSuccessful) {
+                                                                    BF1ToolPlugin.Glogger.error("踹出老毕登${name}最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}失败")
+                                                                    sendMsg(
+                                                                        I,
+                                                                        "踹出老毕登${name}最近KD:${rkd}失败\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}"
+                                                                    )
+                                                                } else {
+                                                                    BF1ToolPlugin.Glogger.warning("踹出老毕登${name}成功\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}")
+                                                                    Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
+                                                                    Cache.KickPlayers.add(name)
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                                        if (lkd > 0 && lkpm > 0)
-                                            Cache.PlayerListInfo[serverInfoForSave.gameID]!![name] =
-                                                plData.copy(lkd = lkd, lkp = lkpm, rkd = rkd, rkp = rkpm)
-                                    }
+                                    })
                                 }
                             }
                         }
+                        tempCo.joinAll()
+                        if (btrIsErr) {
+                            BF1ToolPlugin.Glogger.info("最近数据检测失败,Btr寄了")
+                        }
+                        BF1ToolPlugin.Glogger.info("玩家数据检测")
                     }
-                    if (btrIsErr) {
-                        BF1ToolPlugin.Glogger.info("最近数据检测失败,Btr寄了")
-                    }
-                    BF1ToolPlugin.Glogger.info("玩家数据检测")
                     Thread.sleep(30 * 1000)
                 }
             }
