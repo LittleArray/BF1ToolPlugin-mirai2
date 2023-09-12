@@ -21,16 +21,15 @@ import top.ffshaozi.config.SettingController
 import top.ffshaozi.intent.Cache.BotGroups
 import top.ffshaozi.intent.Intent
 import top.ffshaozi.utils.BF1Api
-import top.ffshaozi.utils.test
 
-object BF1ToolPlugin : KotlinPlugin(
+object NeriQQBot : KotlinPlugin(
     JvmPluginDescription(
-        id = "top.ffshaozi.bf1toolplugin",
-        name = "BF1ToolPlugin",
-        version = "1.0.0",
+        id = "top.ffshaozi.NeriQQBot",
+        name = "NeriBF1QQBot",
+        version = "1.0.4",
     ) {
         author("FFSHAOZI")
-        info("""战地1QQ机器人""")
+        info("""Neri家的战地1QQ机器人""")
     }
 ) {
 
@@ -76,7 +75,6 @@ object BF1ToolPlugin : KotlinPlugin(
                                 data.operator.forEach {
                                     if (it == this.sender.id) isAdmin = true
                                 }
-                                Glogger.info("临时消息处理...")
                                 Intent.runTemp(this, s, isAdmin)
                             } else {
                                 Unit
@@ -96,7 +94,6 @@ object BF1ToolPlugin : KotlinPlugin(
                             data.operator.forEach {
                                 if (it == this.sender.id) isAdmin = true
                             }
-                            Glogger.info("群消息处理...")
                             Intent.run(this, s, isAdmin)
                         }
                     }

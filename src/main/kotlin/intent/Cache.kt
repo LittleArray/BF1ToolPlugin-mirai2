@@ -2,8 +2,7 @@ package top.ffshaozi.intent
 
 import com.google.gson.Gson
 import data.BotsJson
-import top.ffshaozi.BF1ToolPlugin
-import top.ffshaozi.config.Setting
+import top.ffshaozi.NeriQQBot
 import top.ffshaozi.utils.BF1Api
 import java.util.Date
 
@@ -136,8 +135,8 @@ object Cache {
         if (isUseBot) {
             val bot = BF1Api.postBot(botGroup, botUrl, isLog = false)
             if (!bot.isSuccessful) {
-                BF1ToolPlugin.Glogger.warning("唧唧数据获取失败!")
-                BF1ToolPlugin.Glogger.warning(bot.reqBody)
+                NeriQQBot.Glogger.warning("唧唧数据获取失败!")
+                NeriQQBot.Glogger.warning(bot.reqBody)
             } else {
                 botsJson = Gson().fromJson(bot.reqBody, BotsJson::class.java)
             }
@@ -202,7 +201,7 @@ object Cache {
                         tempServerInfo = tempServerInfo?.copy(teamTwoImgUrl = team.image)
                     }
 
-                    else -> BF1ToolPlugin.Glogger.warning(team.teamid)
+                    else -> NeriQQBot.Glogger.warning(team.teamid)
                 }
                 if (isBot) {
                     bots++

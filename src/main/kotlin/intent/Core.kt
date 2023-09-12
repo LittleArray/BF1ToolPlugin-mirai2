@@ -7,7 +7,8 @@ import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.PlainText
-import top.ffshaozi.BF1ToolPlugin.logger
+import top.ffshaozi.NeriQQBot
+import top.ffshaozi.NeriQQBot.logger
 import top.ffshaozi.config.CustomerCmd
 import top.ffshaozi.config.CustomerLang
 import java.util.*
@@ -39,6 +40,7 @@ object Intent {
             }
         }
         return if (result is Message) {
+            NeriQQBot.Glogger.info("临时消息处理...")
             result as Message
         } else {
             PlainText(CustomerLang.errCommand.replace("//err//", msg))
@@ -92,12 +94,13 @@ object Intent {
             }
         }
         return if (result is Message) {
+            NeriQQBot.Glogger.info("群消息处理...")
             result as Message
         } else {
-            if (msg.indexOf("*") == -1){
-                Unit
-            }else{
+            if (msg.indexOf("*") == 0){
                 PlainText(CustomerLang.errCommand.replace("//err//", msg))
+            }else{
+                Unit
             }
         }
     }

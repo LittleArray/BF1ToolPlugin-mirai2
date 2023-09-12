@@ -1,6 +1,6 @@
 package top.ffshaozi.config
 
-import top.ffshaozi.BF1ToolPlugin.Glogger
+import top.ffshaozi.NeriQQBot.Glogger
 import top.ffshaozi.config.Setting.groupData
 import top.ffshaozi.utils.BF1Api
 

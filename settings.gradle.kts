@@ -4,4 +4,4 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = "BF1ToolPlugin"
+rootProject.name = "NeriQQBot"

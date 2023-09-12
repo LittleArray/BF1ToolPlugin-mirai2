@@ -2,6 +2,7 @@ package top.ffshaozi.intent
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.mamoe.mirai.contact.Contact.Companion.sendImage
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -131,7 +132,7 @@ object EnquiryService {
                 <p>时长:-DTPh</p>
             </div>
         """.trimIndent()
-            val classModel ="""
+            val classModel = """
                 <span>
                     <img src="IMG" style="height: 16px;">
                     <p>Name</p>
@@ -140,9 +141,18 @@ object EnquiryService {
                     <p>T:timePlayh</p>
                 </span>
             """.trimIndent()
+            val gameWinModel = """
+                <span>
+                    <p>NAME</p>
+                    <p>P:WINP</p>
+                    <p>W:WINS</p>
+                    <p>L:LOSSES</p>
+                </span>
+            """.trimIndent()
             var wpText = ""
             var classText = ""
             var vpText = ""
+            var gameWinText = ""
             allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEachIndexed { index, weapon ->
                 if (index < 3) {
                     htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
@@ -175,13 +185,21 @@ object EnquiryService {
             allStats.classes?.forEachIndexed { index, classes ->
                 htmlToImage.cacheImg(classes.image, "Class_${classes.className}")
                 classText += classModel
-                    .replace("IMG",htmlToImage.getImgPath())
-                    .replace("Name",classes.className)
-                    .replace("kpms",classes.kpm.toString())
-                    .replace("kills",if (classes.kills > 1000) "${classes.kills.div(100)} ★" else "${classes.kills}")
+                    .replace("IMG", htmlToImage.getImgPath())
+                    .replace("Name", classes.className)
+                    .replace("kpms", classes.kpm.toString())
+                    .replace("kills", if (classes.kills > 1000) "${classes.kills.div(100)} ★" else "${classes.kills}")
                     .replace("timePlay", "${classes.secondsPlayed / 60 / 60}")
             }
-            res = res.replace("WPTEXT", wpText).replace("VPTEXT", vpText).replace("CLTEXT",classText)
+            allStats.gamemodes?.forEachIndexed { index, gamemodes ->
+                gameWinText += gameWinModel
+                    .replace("NAME", gamemodes.gamemodeName)
+                    .replace("WINP", gamemodes.winPercent)
+                    .replace("WINS", gamemodes.wins.toString())
+                    .replace("LOSSES", gamemodes.losses.toString())
+            }
+            res = res.replace("WPTEXT", wpText).replace("VPTEXT", vpText).replace("CLTEXT", classText)
+                .replace("GAMEWINTEXT", gameWinText)
             var eacState = "無記錄"
             val eacInfoJson = BF1Api.searchBFEAC(name)
             if (eacInfoJson.error_code == 0) {
@@ -208,10 +226,11 @@ object EnquiryService {
                     .replace("-Dre_kd", recentlyJson[0].kd)
             }
 
-            htmlToImage.writeTempFile(res)
-            htmlToImage.toImage(1280, 720)
             CoroutineScope(Dispatchers.IO).launch {
+                htmlToImage.writeTempFile(res)
+                htmlToImage.toImage(1280, 720)
                 I.event.subject.sendImage(File(htmlToImage.getFilePath()))
+                delay(1000)
                 htmlToImage.removeIt()
             }
             return "OK".toPlainText()
@@ -293,6 +312,7 @@ object EnquiryService {
             "*战场装备" -> "戰場裝備"
             "*驾驶员" -> "坦克/駕駛員"
             "*制式步枪" -> "制式步槍"
+            "*冲锋枪" -> "衝鋒槍"
             else -> null
         }
         var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
@@ -304,67 +324,107 @@ object EnquiryService {
         }
         //查询
         Intent.sendMsg(I, CustomerLang.searching.replace("//id//", id).replace("//action//", "武器数据"))
-        val tempWeaponsJson = BF1Api.getWeapon(id)
-        val message = I.event.buildForwardMessage {
-            add(I.event.bot.id, I.event.bot.nick, PlainText("回复:${id}"))
-            if (tempWeaponsJson.isSuccessful) {
-                val newWp = tempWeaponsJson.weapons!!.sortedByDescending { weapons -> weapons.kills }
-                var index = 0
-                newWp.forEach {
-                    if (typeI != null) {
-                        if (it.type == typeI) {
-                            if (index < 60) {
-                                add(
-                                    I.event.bot.id, I.event.bot.nick,
-                                    PlainText(
-                                        """
-                            武器名:${it.weaponName} 
-                            击杀数:${it.kills} ${it.kills / 100}☆
-                            爆头数:${it.headshotKills}
-                            爆头率:${it.headshots}
-                            命中率:${it.accuracy}
-                            KPM:${it.killsPerMinute}
-                            效率:${it.hitVKills}
-                            时长:${it.timeEquipped / 60 / 60}h
-                            类型:${it.type}
-                                            """.trimIndent()
-                                    )
-                                )
-                                index++
-                            }
-                        }
+        val name = id
+        val allStats = BF1Api.getAllStats(name)
+        if (allStats.isSuccessful) {
+            val htmlToImage = HtmlToImage()
+            val content = htmlToImage.readIt("weapon")
+            var res = content
+                .replace("-DNAME", name)
+                .replace("-DRANK", allStats.rank.toString())
+                .replace("-DCPRO", allStats.currentRankProgress.toString())
+                .replace("-DTPRO", allStats.totalRankProgress.toString())
+                .replace("-DGTIME", "${allStats.secondsPlayed?.div(60)?.div(60)}")
+                .replace("-DBEST", "${allStats.bestClass}")
+                .replace("-DLKD", "${allStats.killDeath}")
+                .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace(
+                    "-DKILLS",
+                    if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
+                )
+                .replace(
+                    "-DDEATH",
+                    if (allStats.deaths != null && allStats.deaths > 10000) "${allStats.deaths.div(100)} ★" else "${allStats.deaths}"
+                )
+            if (allStats.activePlatoon != null) {
+                if (allStats.activePlatoon.emblem != null && allStats.activePlatoon.tag != null) {
+                    val cacheImg =
+                        htmlToImage.cacheImg(allStats.activePlatoon.emblem, "Platoon_${allStats.activePlatoon.tag}")
+                    res = if (cacheImg) {
+                        res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("-DPO", allStats.activePlatoon.tag)
                     } else {
-                        if (index < 60) {
-                            add(
-                                I.event.bot.id, I.event.bot.nick,
-                                PlainText(
-                                    """
-                            武器名:${it.weaponName} 
-                            击杀数:${it.kills} ${it.kills / 100}☆
-                            爆头数:${it.headshotKills}
-                            爆头率:${it.headshots}
-                            命中率:${it.accuracy}
-                            KPM:${it.killsPerMinute}
-                            效率:${it.hitVKills}
-                            时长:${it.timeEquipped / 60 / 60}h
-                            类型:${it.type}
-                                            """.trimIndent()
-                                )
-                            )
-                            index++
+                        htmlToImage.cacheImg(allStats.activePlatoon.emblem, "Avatar_Def")
+                        res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("-DPO", allStats.activePlatoon.tag)
+                    }
+                } else {
+                    //头像缓存
+                    if (allStats.avatar != null) {
+                        val cacheImg = htmlToImage.cacheImg(allStats.avatar, "Avatar_${name}")
+                        res = if (cacheImg) {
+                            res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("[-DPO]", "")
+                        } else {
+                            htmlToImage.cacheImg(allStats.avatar, "Avatar_Def")
+                            res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("[-DPO]", "")
                         }
                     }
                 }
-            } else {
-                add(
-                    I.event.bot.id,
-                    I.event.bot.nick,
-                    PlainText(CustomerLang.searchErr.replace("//action//", "武器数据"))
-                )
             }
+            val wpModel = """
+            <div class="item">
+                <p>NAME</p>
+                <img src="IMG">
+                <span>
+                    <p>擊殺:KILLS</p>
+                    <p>KPM:-DKPM</p>
+                    <p>效率:-DVP</p>
+                </span>
+                <span>
+                    <p>精确率:-DAC</p>
+                    <p>爆头率:-DHS</p>
+                    <p>时长:-DTPh</p>
+                </span>
+            </div>
+        """.trimIndent()
+            var line1 = ""
+            var line2 = ""
+            var line3 = ""
+            var line4 = ""
+            var weaponIndex = 0
+            allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEach { weapon ->
+                if (typeI == weapon.type || typeI == null) {
+                    weaponIndex++
+                    htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
+                    val temp = wpModel
+                        .replace("KILLS", if (weapon.kills > 1000) "${weapon.kills.div(100)} ★" else "${weapon.kills}")
+                        .replace("NAME", weapon.weaponName)
+                        .replace("-DKPM", weapon.killsPerMinute.toString())
+                        .replace("-DVP", weapon.hitVKills.toString())
+                        .replace("-DAC", weapon.accuracy)
+                        .replace("-DHS", weapon.headshots)
+                        .replace("-DTP", "${weapon.timeEquipped / 60 / 60}")
+                        .replace("IMG", htmlToImage.getImgPath())
+                    when (weaponIndex) {
+                        in 1..3 -> line1 += temp
+                        in 4..6 -> line2 += temp
+                        in 7..9 -> line3 += temp
+                        in 10..12 -> line4 += temp
+                    }
+                }
+            }
+            res = res.replace("LINE1", line1).replace("LINE2", line2).replace("LINE3", line3).replace("LINE4", line4)
+            CoroutineScope(Dispatchers.IO).launch {
+                htmlToImage.writeTempFile(res)
+                htmlToImage.toImage(1280, 720)
+                I.event.subject.sendImage(File(htmlToImage.getFilePath()))
+                delay(1000)
+                htmlToImage.removeIt()
+            }
+            return "OK".toPlainText()
+        } else {
+            return PlainText(CustomerLang.searchErr.replace("//action//", "武器数据"))
         }
-        return message
     }
+
 
     //TODO 查询载具实现
     fun searchVehicle(I: PullIntent): Message {
@@ -377,32 +437,101 @@ object EnquiryService {
         }
         //查询
         Intent.sendMsg(I, CustomerLang.searching.replace("//id//", id).replace("//action//", "载具数据"))
-        val tankJson = BF1Api.getVehicles(id)
-        val message = I.event.buildForwardMessage {
-            add(I.event.bot.id, I.event.bot.nick, PlainText("回复:${id}"))
-            if (tankJson.isSuccessful) {
-                tankJson.vehicles?.sortedByDescending { vehicles -> vehicles.kills }?.forEach {
-                    add(
-                        I.event.bot.id, I.event.bot.nick,
-                        """
-                            名称:${it.vehicleName}
-                            类型:${it.type}
-                            时长:${it.timeIn / 60 / 60}h
-                            击杀数:${it.kills} ${it.kills / 100}☆
-                            摧毁数:${it.destroyed}
-                            KPM:${it.killsPerMinute}
-                        """.trimIndent().toPlainText()
-                    )
-                }
-            } else {
-                add(
-                    I.event.bot.id,
-                    I.event.bot.nick,
-                    CustomerLang.searchErr.replace("//action//", "载具数据").toPlainText()
+        val name = id
+        val allStats = BF1Api.getAllStats(name)
+        if (allStats.isSuccessful) {
+            val htmlToImage = HtmlToImage()
+            val content = htmlToImage.readIt("vehicle")
+            var res = content
+                .replace("-DNAME", name)
+                .replace("-DRANK", allStats.rank.toString())
+                .replace("-DCPRO", allStats.currentRankProgress.toString())
+                .replace("-DTPRO", allStats.totalRankProgress.toString())
+                .replace("-DGTIME", "${allStats.secondsPlayed?.div(60)?.div(60)}")
+                .replace("-DBEST", "${allStats.bestClass}")
+                .replace("-DLKD", "${allStats.killDeath}")
+                .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace(
+                    "-DKILLS",
+                    if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
                 )
+                .replace(
+                    "-DDEATH",
+                    if (allStats.deaths != null && allStats.deaths > 10000) "${allStats.deaths.div(100)} ★" else "${allStats.deaths}"
+                )
+            if (allStats.activePlatoon != null) {
+                if (allStats.activePlatoon.emblem != null && allStats.activePlatoon.tag != null) {
+                    val cacheImg =
+                        htmlToImage.cacheImg(allStats.activePlatoon.emblem, "Platoon_${allStats.activePlatoon.tag}")
+                    res = if (cacheImg) {
+                        res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("-DPO", allStats.activePlatoon.tag)
+                    } else {
+                        htmlToImage.cacheImg(allStats.activePlatoon.emblem, "Avatar_Def")
+                        res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("-DPO", allStats.activePlatoon.tag)
+                    }
+                } else {
+                    //头像缓存
+                    if (allStats.avatar != null) {
+                        val cacheImg = htmlToImage.cacheImg(allStats.avatar, "Avatar_${name}")
+                        res = if (cacheImg) {
+                            res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("[-DPO]", "")
+                        } else {
+                            htmlToImage.cacheImg(allStats.avatar, "Avatar_Def")
+                            res.replace("-DPROFILEP", htmlToImage.getImgPath()).replace("[-DPO]", "")
+                        }
+                    }
+                }
             }
+            val vpModel = """
+            <div class="item">
+                <p>NAME</p>
+                <img src="IMG">
+                <span>
+                    <p>擊殺:KILLS</p>
+                    <p>KPM:-DKPM</p>
+                    <p>摧毁:-DS</p>
+                </span>
+                <p>时长:-DTPh</p>
+            </div>
+        """.trimIndent()
+            var line1 = ""
+            var line2 = ""
+            var line3 = ""
+            var line4 = ""
+            var vehiclesIndex = 0
+            allStats.vehicles?.sortedByDescending { vehicles -> vehicles.kills }?.forEach { vehicles ->
+                vehiclesIndex++
+                htmlToImage.cacheImg(vehicles.image, "Vehicles_${vehicles.vehicleName}")
+                val temp = vpModel
+                    .replace(
+                        "KILLS",
+                        if (vehicles.kills > 1000) "${vehicles.kills.div(100)} ★" else "${vehicles.kills}"
+                    )
+                    .replace("NAME", vehicles.vehicleName)
+                    .replace("-DKPM", vehicles.killsPerMinute.toString())
+                    .replace("-DS", vehicles.destroyed.toString())
+                    .replace("-DTP", "${vehicles.timeIn / 60 / 60}")
+                    .replace("IMG", htmlToImage.getImgPath())
+                when (vehiclesIndex) {
+                    in 1..3 -> line1 += temp
+                    in 4..6 -> line2 += temp
+                    in 7..9 -> line3 += temp
+                    in 10..12 -> line4 += temp
+                }
+
+            }
+            res = res.replace("LINE1", line1).replace("LINE2", line2).replace("LINE3", line3).replace("LINE4", line4)
+            CoroutineScope(Dispatchers.IO).launch {
+                htmlToImage.writeTempFile(res)
+                htmlToImage.toImage(1280, 720)
+                I.event.subject.sendImage(File(htmlToImage.getFilePath()))
+                delay(1000)
+                htmlToImage.removeIt()
+            }
+            return "OK".toPlainText()
+        } else {
+            return PlainText(CustomerLang.searchErr.replace("//action//", "载具数据"))
         }
-        return message
     }
 
     //TODO 查询服务器实现
@@ -438,7 +567,10 @@ object EnquiryService {
     //TODO 查询服务器玩家列表的实现
     fun searchServerList(I: PullIntent, re: Boolean = false): Message {
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*pl <ServerCount>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
+        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
+            "//err//",
+            ""
+        )
             .toPlainText()
         if (re) SettingController.refreshServerInfo(I.event.group.id)
         val index = I.sp[1].toInt()
@@ -659,10 +791,15 @@ object EnquiryService {
         return "OK".toPlainText()
     }
 
+
     //TODO 搜索服务器玩家
     fun searchServerListPlayer(I: PullIntent, re: Boolean = false): Message {
-        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*ssi <ServerCount> <ID>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*ssi <ServerCount> <ID>")
+            .toPlainText()
+        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
+            "//err//",
+            ""
+        )
             .toPlainText()
         if (re) SettingController.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
@@ -670,10 +807,13 @@ object EnquiryService {
             if (index + 1 == serverCount) {
                 if (it.gameID.isNullOrEmpty()) {
                     if (re) return CustomerLang.serverInfoRErr.toPlainText()
-                    searchServerList(I, re = true)
+                    searchServerListPlayer(I, re = true)
                     return CustomerLang.serverInfoRefreshing.toPlainText()
                 }
-                Intent.sendMsg(I, CustomerLang.searching.replace("//id//", I.sp[2]).replace("//action//", "服务器玩家"))
+                Intent.sendMsg(
+                    I,
+                    CustomerLang.searching.replace("//id//", I.sp[2]).replace("//action//", "服务器玩家")
+                )
                 val serverListJson = BF1Api.searchServerList(it.gameID!!)
                 return if (serverListJson.isSuccessful == true) {
                     var p = "在服务器${serverCount}中查找到\n"

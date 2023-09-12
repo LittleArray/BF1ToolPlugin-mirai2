@@ -5,7 +5,7 @@ import data.MultiCheckResponse
 import kotlinx.coroutines.*
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.toPlainText
-import top.ffshaozi.BF1ToolPlugin
+import top.ffshaozi.NeriQQBot
 import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
 import top.ffshaozi.config.Setting.groupData
@@ -56,7 +56,7 @@ object CycleTask {
                         }
                     }
                     serverEAC(I)
-                    BF1ToolPlugin.Glogger.info("服务器列表更新线程")
+                    NeriQQBot.Glogger.info("服务器列表更新线程")
                     Thread.sleep(25 * 1000)
                 }
             }
@@ -68,7 +68,7 @@ object CycleTask {
 
     //Thread - BFEAC检测(缓存算法)
     fun serverEAC(I: PullIntent) {
-        BF1ToolPlugin.Glogger.info("挂钩开踹")
+        NeriQQBot.Glogger.info("挂钩开踹")
         serverInfoIterator { groupID, data, index, serverInfoForSave ->
             run p@{
                 if (groupID != I.event.group.id) return@p
@@ -106,7 +106,7 @@ object CycleTask {
                             I,
                             "挂钩${name}在${index}服被狠狠上市了\nhttps://www.bfeac.com/?#/case/$case_id"
                         )
-                        BF1ToolPlugin.Glogger.error("挂钩${name}在${index}服被狠狠上市了 https://www.bfeac.com/?#/case/$case_id")
+                        NeriQQBot.Glogger.error("挂钩${name}在${index}服被狠狠上市了 https://www.bfeac.com/?#/case/$case_id")
                         Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
                         Cache.KickPlayers.add(name)
                     }
@@ -183,7 +183,7 @@ object CycleTask {
                             players[gameID] = player
                         }
                     }
-                    BF1ToolPlugin.Glogger.info("玩家数量检测")
+                    NeriQQBot.Glogger.info("玩家数量检测")
                     Thread.sleep(60 * 1000)
                 }
             }
@@ -282,13 +282,13 @@ object CycleTask {
                                                                     "KD/KPM Limited"
                                                                 )
                                                                 if (!kickPlayer.isSuccessful) {
-                                                                    BF1ToolPlugin.Glogger.error("踹出老毕登${name}最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}失败")
+                                                                    NeriQQBot.Glogger.error("踹出老毕登${name}最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}失败")
                                                                     sendMsg(
                                                                         I,
                                                                         "踹出老毕登${name}最近KD:${rkd}失败\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}"
                                                                     )
                                                                 } else {
-                                                                    BF1ToolPlugin.Glogger.warning("踹出老毕登${name}成功\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}")
+                                                                    NeriQQBot.Glogger.warning("踹出老毕登${name}成功\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}")
                                                                     Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
                                                                     Cache.KickPlayers.add(name)
                                                                 }
@@ -304,9 +304,9 @@ object CycleTask {
                         }
                         tempCo.joinAll()
                         if (btrIsErr) {
-                            BF1ToolPlugin.Glogger.info("最近数据检测失败,Btr寄了")
+                            NeriQQBot.Glogger.info("最近数据检测失败,Btr寄了")
                         }
-                        BF1ToolPlugin.Glogger.info("玩家数据检测")
+                        NeriQQBot.Glogger.info("玩家数据检测")
                     }
                     Thread.sleep(30 * 1000)
                 }
@@ -346,7 +346,7 @@ object CycleTask {
                             }
                         }
                     }
-                    BF1ToolPlugin.Glogger.info("VIP管理服务")
+                    NeriQQBot.Glogger.info("VIP管理服务")
                     Thread.sleep(10000)
                 }
             }

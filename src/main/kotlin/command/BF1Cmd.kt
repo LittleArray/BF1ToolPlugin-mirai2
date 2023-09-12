@@ -3,7 +3,7 @@ package top.ffshaozi.command
 import net.mamoe.mirai.console.command.CommandSender
 import net.mamoe.mirai.console.command.CompositeCommand
 import net.mamoe.mirai.console.command.descriptor.ExperimentalCommandDescriptors
-import top.ffshaozi.BF1ToolPlugin
+import top.ffshaozi.NeriQQBot
 import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
 import top.ffshaozi.config.Setting.groupData
@@ -13,7 +13,7 @@ import top.ffshaozi.intent.Cache.BotGroups
 // 简单指令
 
 object BF1Cmd : CompositeCommand(
-    BF1ToolPlugin,
+    NeriQQBot,
     primaryName = "bf1",
     description = "战地1设置"
 ) {

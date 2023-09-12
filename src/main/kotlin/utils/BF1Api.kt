@@ -10,7 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
-import top.ffshaozi.BF1ToolPlugin.Glogger
+import top.ffshaozi.NeriQQBot.Glogger
 import top.ffshaozi.data.*
 import java.io.File
 import java.text.SimpleDateFormat
