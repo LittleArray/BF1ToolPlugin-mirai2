@@ -1,10 +1,8 @@
 package top.ffshaozi.intent
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.mamoe.mirai.contact.Contact.Companion.sendImage
+import net.mamoe.mirai.contact.Contact.Companion.uploadImage
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.*
 import top.ffshaozi.config.CustomerLang
@@ -38,7 +36,7 @@ object EnquiryService {
     }
 
     //TODO 查询自己实现
-    fun searchMe(I: PullIntent): Message {
+    suspend fun searchMe(I: PullIntent): Any {
         var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
@@ -81,6 +79,7 @@ object EnquiryService {
                 .replace("-DkillAssists", "${allStats.killAssists}")
                 .replace("-DhighestKillStreak", "${allStats.highestKillStreak}")
                 .replace("-DlongestHeadShotm", "${allStats.longestHeadShot}")
+                .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
             if (allStats.activePlatoon != null) {
                 if (allStats.activePlatoon.emblem != null && allStats.activePlatoon.tag != null) {
                     val cacheImg =
@@ -225,15 +224,9 @@ object EnquiryService {
                     .replace("-Dre_kpm", recentlyJson[0].kpm)
                     .replace("-Dre_kd", recentlyJson[0].kd)
             }
-
-            CoroutineScope(Dispatchers.IO).launch {
-                htmlToImage.writeTempFile(res)
-                htmlToImage.toImage(1280, 720)
-                I.event.subject.sendImage(File(htmlToImage.getFilePath()))
-                delay(1000)
-                htmlToImage.removeIt()
-            }
-            return "OK".toPlainText()
+            htmlToImage.writeTempFile(res)
+            htmlToImage.toImage(1280, 720)
+            return I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
         } else {
             return PlainText(CustomerLang.searchErr.replace("//action//", "基础数据"))
         }
@@ -299,7 +292,7 @@ object EnquiryService {
     }
 
     //TODO 查询武器实现
-    fun searchWp(I: PullIntent, type: String? = null): Message {
+    suspend fun searchWp(I: PullIntent, type: String? = null): Message {
         val typeI = when (type) {
             "*霰弹枪" -> "霰彈槍"
             "*轻机枪" -> "輕機槍"
@@ -338,6 +331,7 @@ object EnquiryService {
                 .replace("-DBEST", "${allStats.bestClass}")
                 .replace("-DLKD", "${allStats.killDeath}")
                 .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
                 .replace(
                     "-DKILLS",
                     if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
@@ -412,14 +406,9 @@ object EnquiryService {
                 }
             }
             res = res.replace("LINE1", line1).replace("LINE2", line2).replace("LINE3", line3).replace("LINE4", line4)
-            CoroutineScope(Dispatchers.IO).launch {
-                htmlToImage.writeTempFile(res)
-                htmlToImage.toImage(1280, 720)
-                I.event.subject.sendImage(File(htmlToImage.getFilePath()))
-                delay(1000)
-                htmlToImage.removeIt()
-            }
-            return "OK".toPlainText()
+            htmlToImage.writeTempFile(res)
+            htmlToImage.toImage(1280, 720)
+            return I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
         } else {
             return PlainText(CustomerLang.searchErr.replace("//action//", "武器数据"))
         }
@@ -427,7 +416,7 @@ object EnquiryService {
 
 
     //TODO 查询载具实现
-    fun searchVehicle(I: PullIntent): Message {
+    suspend fun searchVehicle(I: PullIntent): Message {
         var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
@@ -451,6 +440,7 @@ object EnquiryService {
                 .replace("-DBEST", "${allStats.bestClass}")
                 .replace("-DLKD", "${allStats.killDeath}")
                 .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
                 .replace(
                     "-DKILLS",
                     if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
@@ -521,14 +511,9 @@ object EnquiryService {
 
             }
             res = res.replace("LINE1", line1).replace("LINE2", line2).replace("LINE3", line3).replace("LINE4", line4)
-            CoroutineScope(Dispatchers.IO).launch {
-                htmlToImage.writeTempFile(res)
-                htmlToImage.toImage(1280, 720)
-                I.event.subject.sendImage(File(htmlToImage.getFilePath()))
-                delay(1000)
-                htmlToImage.removeIt()
-            }
-            return "OK".toPlainText()
+            htmlToImage.writeTempFile(res)
+            htmlToImage.toImage(1280, 720)
+            return I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
         } else {
             return PlainText(CustomerLang.searchErr.replace("//action//", "载具数据"))
         }
@@ -574,7 +559,7 @@ object EnquiryService {
             .toPlainText()
         if (re) SettingController.refreshServerInfo(I.event.group.id)
         val index = I.sp[1].toInt()
-        var msg: Message? = null
+        var msg: Message = PlainText(CustomerLang.searchErr.replace("//action//", "玩家列表"))
         val team1 = ForwardMessageBuilder(I.event.group)
         team1.add(I.event.bot, PlainText("队伍1"))
         val team2 = ForwardMessageBuilder(I.event.group)
@@ -781,14 +766,14 @@ object EnquiryService {
 
                     htmlToImage.writeTempFile(res)
                     htmlToImage.toImage()
-                    CoroutineScope(Dispatchers.IO).launch {
-                        I.event.subject.sendImage(File(htmlToImage.getFilePath()))
-                        htmlToImage.removeIt()
+                    runBlocking {
+                        msg = I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
                     }
+
                 }
             }
         }
-        return "OK".toPlainText()
+        return msg
     }
 
 

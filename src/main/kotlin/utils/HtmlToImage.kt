@@ -1,9 +1,6 @@
 package top.ffshaozi.utils
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import net.mamoe.mirai.console.MiraiConsole
 import net.mamoe.mirai.console.rootDir
 import top.ffshaozi.intent.Cache
@@ -40,6 +37,9 @@ class HtmlToImage {
             Runtime.getRuntime().exec("taskkill /f /im chrome.exe")
         }
         process.waitFor()
+        runBlocking {
+            delay(1000)
+        }
         return true
     }
 
@@ -61,7 +61,13 @@ class HtmlToImage {
         File(tempFile).writeText(content)
     }
 
-    fun getFilePath() = plImg
+    fun getFilePath() : String{
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(60000)
+            removeIt()
+        }
+       return plImg
+    }
     fun removeIt() {
         File(plImg).delete()
         File(tempFile).delete()

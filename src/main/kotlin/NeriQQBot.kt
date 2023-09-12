@@ -25,7 +25,7 @@ import top.ffshaozi.utils.BF1Api
 object NeriQQBot : KotlinPlugin(
     JvmPluginDescription(
         id = "top.ffshaozi.NeriQQBot",
-        name = "NeriBF1QQBot",
+        name = "NeriQQBot",
         version = "1.0.4",
     ) {
         author("FFSHAOZI")
@@ -86,7 +86,7 @@ object NeriQQBot : KotlinPlugin(
                 Glogger.info("重注册${bot.id}群会话事件响应 ")
                 bot.eventChannel.subscribeGroupMessages {
                     groupData.forEach { (it, data) ->
-                        sentFrom(it) reply { s ->
+                        sentFrom(it) quoteReply  { s ->
                             var isAdmin = false
                             this.group.members.forEach {
                                 if (it.permission.level != 0 && it.id == this.sender.id) isAdmin = true
