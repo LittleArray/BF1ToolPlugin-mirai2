@@ -122,7 +122,7 @@ data class AllStats(
         val shotsFired: Int,
         val shotsHit: Int,
         val timeEquipped: Int,
-        val type: String,
+        var type: String,
         val weaponName: String
     )
 }

@@ -299,6 +299,9 @@ object EnquiryService {
             "*配备" -> "配備"
             "*半自动步枪" -> "半自動步槍"
             "*配枪" -> "佩槍"
+            "*佩枪" -> "佩槍"
+            "*手枪" -> "佩槍"
+            "*副武器" -> "佩槍"
             "*近战武器" -> "近戰武器"
             "*手榴弹" -> "手榴彈"
             "*步枪" -> "步槍"
@@ -385,6 +388,9 @@ object EnquiryService {
             var line4 = ""
             var weaponIndex = 0
             allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEach { weapon ->
+                if (weapon.weaponName.indexOf("三八") !=-1 ){
+                    weapon.type = "步槍"
+                }
                 if (typeI == weapon.type || typeI == null) {
                     weaponIndex++
                     htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")

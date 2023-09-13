@@ -56,7 +56,7 @@ object Intent {
             cmdSize = cmdSize
         )
         val vp =
-            listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*步枪", "*制式步枪")
+            listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*步枪", "*制式步枪","*手枪","*副武器","*佩枪")
         var result: Any? = null
         val cmdList = hashMapOf(
             CustomerCmd.vips to { runBlocking { CycleTask.vipRefresh(pullIntent) } },
