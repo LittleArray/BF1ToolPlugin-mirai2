@@ -19,6 +19,8 @@ object CustomerCmd : ReadOnlyPluginConfig("CustomerCmd") {
     val help by value(listOf("*help", "*帮助", "*?"))
     @ValueDescription("绑定")
     val binding by value(listOf("*bd", "*绑定"))
+    @ValueDescription("查询你游")
+    val bf1 by value(listOf("*战地1", "*战地一","你游"))
     @ValueDescription("搜索服务器")
     val ss by value(listOf("*ss", "*f") )
     @ValueDescription("搜索服务器列表")

@@ -277,8 +277,8 @@ object ServerManagement {
                     return CustomerLang.serverInfoRefreshing.toPlainText()
                 }
                 val player:HashMap<String,Int> = hashMapOf()
-                Cache.PlayerListInfo[it.gameID!!]?.forEach{id,pldata->
-                    if (id.indexOf(I.sp[2],0,false) != -1)player[id] = pldata.teamId
+                Cache.PlayerListInfo[it.gameID!!]?.forEach{pldata->
+                    if (pldata.id.indexOf(I.sp[2],0,false) != -1) player[pldata.id] = pldata.teamId
                 }
                 if (player.size > 1){
                     var temp = "找到多个ID,无法确认\n"

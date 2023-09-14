@@ -57,7 +57,7 @@ object CycleTask {
                     }
                     serverEAC(I)
                     NeriQQBot.Glogger.info("服务器列表更新线程")
-                    Thread.sleep(25 * 1000)
+                    Thread.sleep(15 * 1000)
                 }
             }
             Cache.ListThreadPool[I.event.group.id]?.start()
@@ -74,10 +74,10 @@ object CycleTask {
                 if (groupID != I.event.group.id) return@p
                 val cacheBan: MultiCheckResponse
                 val cacheList = MultiCheckPostJson()
-                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, data) ->
+                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach {  data->
                     var isKick = false
                     Cache.KickPlayers.forEach {
-                        if (it == name) isKick = true
+                        if (it == data.id) isKick = true
                     }
                     if (!isKick)
                         cacheList.pids.add(data.pid)
@@ -86,8 +86,8 @@ object CycleTask {
                 cacheBan = searchBFEAC(cacheList, false)
                 cacheBan.data.forEach {
                     var name = ""
-                    Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (id, data) ->
-                        if (data.pid == it) name = id
+                    Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { data ->
+                        if (data.pid == it) name = data.id
                     }
                     val kickPlayer = kickPlayer(
                         serverInfoForSave.sessionId!!,
@@ -107,7 +107,9 @@ object CycleTask {
                             "挂钩${name}在${index}服被狠狠上市了\nhttps://www.bfeac.com/?#/case/$case_id"
                         )
                         NeriQQBot.Glogger.error("挂钩${name}在${index}服被狠狠上市了 https://www.bfeac.com/?#/case/$case_id")
-                        Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
+                        Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.removeIf {
+                            it.id == name
+                        }
                         Cache.KickPlayers.add(name)
                     }
                 }
@@ -130,7 +132,7 @@ object CycleTask {
                             if (groupID != I.event.group.id) return@p
                             val gameID = serverInfoForSave.gameID!!
                             var (player, bot, loadingBots) = mutableListOf(0, 0, 0)
-                            Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, data) ->
+                            Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { data->
                                 if (data.isBot) {
                                     bot++
                                     if (data.botState == "Loading") loadingBots++
@@ -222,7 +224,7 @@ object CycleTask {
                             run p@{
                                 if (groupID != I.event.group.id) return@p
                                 if (Cache.cacheLife.size > 300) Cache.cacheLife = mutableSetOf()
-                                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { (name, plData) ->
+                                Cache.PlayerListInfo[serverInfoForSave.gameID]?.forEach { plData ->
                                     tempCo.add(launch {
                                         var rkd = 0f
                                         var rkpm = 0f
@@ -230,16 +232,16 @@ object CycleTask {
                                         var lkpm: Float
                                         run c@{
                                             //生涯检测
-                                            val stats = getStats(name, false)
+                                            val stats = getStats(plData.id, false)
                                             lkd = stats.killDeath.toFloat()
                                             lkpm = stats.killsPerMinute.toFloat()
                                             if (plData.rank == 0) plData.rank = stats.rank
                                             if (plData.pid == 0L) plData.pid = stats.id
                                             if (lkd > 0 && lkpm > 0 && plData.pid > 0 && plData.rank != 0) {
-                                                Cache.cacheLife.add(name)
+                                                Cache.cacheLife.add(plData.id)
                                             }
                                             //最近数据检测
-                                            val recentlyJson = recentlySearch(name, false)
+                                            val recentlyJson = recentlySearch(plData.id, false)
                                             if (recentlyJson.isNotEmpty()) {
                                                 run fe@{
                                                     recentlyJson.forEachIndexed { index2, it ->
@@ -261,7 +263,14 @@ object CycleTask {
                                                 }
                                             }
                                             if (lkd > 0 && lkpm > 0) {
-                                                Cache.PlayerListInfo[serverInfoForSave.gameID]!![name] = plData.copy(lkd = lkd, lkp = lkpm, rkd = rkd, rkp = rkpm)
+                                                Cache.PlayerListInfo[serverInfoForSave.gameID]!!.forEach {
+                                                    if (it.id == plData.id){
+                                                        it.lkd = lkd
+                                                        it.lkp = lkpm
+                                                        it.rkd = rkd
+                                                        it.rkp = rkpm
+                                                    }
+                                                }
                                                 if (lkd > serverInfoForSave.lifeMaxKD ||
                                                     lkpm > serverInfoForSave.lifeMaxKPM ||
                                                     rkpm > serverInfoForSave.recentlyMaxKPM ||
@@ -271,10 +280,10 @@ object CycleTask {
                                                         if (serverInfoForSave.isEnableAutoKick) {
                                                             var isW = false
                                                             groupData[I.event.group.id]?.recentlyTempWhitelist?.forEach {
-                                                                if (name == it) isW=true
+                                                                if (plData.id == it) isW=true
                                                             }
                                                             if (!isW){
-                                                                val pid = getPersonaid(name)
+                                                                val pid = getPersonaid(plData.id)
                                                                 val kickPlayer = kickPlayer(
                                                                     serverInfoForSave.sessionId!!,
                                                                     serverInfoForSave.gameID!!,
@@ -282,15 +291,17 @@ object CycleTask {
                                                                     "KD/KPM Limited"
                                                                 )
                                                                 if (!kickPlayer.isSuccessful) {
-                                                                    NeriQQBot.Glogger.error("踹出老毕登${name}最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}失败")
+                                                                    NeriQQBot.Glogger.error("踹出老毕登${plData.id} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}失败")
                                                                     sendMsg(
                                                                         I,
-                                                                        "踹出老毕登${name}最近KD:${rkd}失败\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}"
+                                                                        "踹出老毕登${plData.id} 失败\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}"
                                                                     )
                                                                 } else {
-                                                                    NeriQQBot.Glogger.warning("踹出老毕登${name}成功\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}")
-                                                                    Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.remove(name)
-                                                                    Cache.KickPlayers.add(name)
+                                                                    NeriQQBot.Glogger.warning("踹出老毕登${plData.id}成功\n最近KD:${rkd} 最近KPM:${rkpm} 生涯KD:${lkd} 生涯KPM:${rkpm}")
+                                                                    Cache.PlayerListInfo[serverInfoForSave.gameID!!]?.removeIf {
+                                                                        plData.id == it.id
+                                                                    }
+                                                                    Cache.KickPlayers.add(plData.id)
                                                                 }
                                                             }
                                                         }

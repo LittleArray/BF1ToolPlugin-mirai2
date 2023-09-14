@@ -2,8 +2,15 @@ package top.ffshaozi.intent
 
 import com.google.gson.Gson
 import data.BotsJson
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import top.ffshaozi.NeriQQBot
+import top.ffshaozi.NeriQQBot.save
+import top.ffshaozi.config.BotReportLog
 import top.ffshaozi.utils.BF1Api
+import top.ffshaozi.utils.PostResponse
+import java.text.SimpleDateFormat
 import java.util.Date
 
 /*** 全局数据的缓存
@@ -27,14 +34,11 @@ object Cache {
     //玩家生涯数据检测线程池
     var PlayerDataThreadPool: HashMap<Long, Thread> = hashMapOf()
 
-    //玩家最近数据检测线程池
-    var RPDataThreadPool: HashMap<Long, Thread> = hashMapOf()
-
     //服务器管理线程池
     var ServerManageThreadPool: HashMap<Long, Boolean> = hashMapOf()
 
     //临时服务器玩家数据
-    var PlayerListInfo: HashMap<String, HashMap<String, ServerInfo.Player>> = hashMapOf()
+    var PlayerListInfo: HashMap<String,  MutableList<PlayerCache>> = hashMapOf()
 
     //临时服务器数据
     var ServerInfoList: HashMap<String, ServerInfo> = hashMapOf()
@@ -103,22 +107,51 @@ object Cache {
         var loadingPlayers: Int = 0,
         val cacheTime: Date,
         val zeroTime:Int = 0,
+    )
+
+    class PlayerCache(
+        var id:String,
+        var team: String,
+        var teamId: Int,
+        var rank: Int,
+        var pid: Long = 0L,
+        var platoon: String = "",
+        var join_time: Long,
+        var latency: Int,
+        var isBot: Boolean = false,
+        var botState: String = "",
+        var gameID: String = "",
+        var RSPid: String ="",
+        var ssid:String =""
     ){
-        data class Player(
-            var team: String,
-            var teamId: Int,
-            var rank: Int,
-            var pid: Long = 0L,
-            var platoon: String = "",
-            var join_time: Long,
-            var latency: Int,
-            var isBot: Boolean = false,
-            var botState: String = "",
-            var lkd: Float = 0f,
-            var lkp: Float = 0f,
-            var rkd: Float = 0f,
-            var rkp: Float = 0f,
-        )
+        var lkd: Float = 0f
+            set(value) {
+                field = value
+            }
+        var lkp: Float = 0f
+            set(value) {
+                field = value
+            }
+        var rkd: Float = 0f
+            set(value) {
+                field = value
+            }
+        var rkp: Float = 0f
+            set(value) {
+                field = value
+            }
+
+        private val coroutineScope = CoroutineScope(Dispatchers.IO)
+
+        fun kick(reason:String): PostResponse {
+            return BF1Api.kickPlayer(this.ssid,this.gameID,this.pid.toString(),reason)
+        }
+        fun ban():PostResponse{
+            return BF1Api.addServerBan(this.ssid,this.RSPid.toInt(),this.id)
+        }
+        fun stats(){
+
+        }
     }
 
     /**
@@ -133,15 +166,16 @@ object Cache {
         if (list.isSuccessful == false) return
         var botsJson: BotsJson? = null
         if (isUseBot) {
-            val bot = BF1Api.postBot(botGroup, botUrl, isLog = false)
+            val bot = BF1Api.getBots(botGroup, botUrl, isLog = false)
             if (!bot.isSuccessful) {
                 NeriQQBot.Glogger.warning("唧唧数据获取失败!")
                 NeriQQBot.Glogger.warning(bot.reqBody)
             } else {
                 botsJson = Gson().fromJson(bot.reqBody, BotsJson::class.java)
+                //NeriQQBot.Glogger.warning("唧唧总数:${botsJson?.data?.totalCount}")
             }
         }
-        val temp: HashMap<String, ServerInfo.Player> = hashMapOf()
+        val temp: MutableList<PlayerCache> = mutableListOf()
         val tempCacheLife: MutableSet<String> = mutableSetOf()
         var tempServerInfo: ServerInfo? =
             list.serverinfo?.let {
@@ -174,30 +208,34 @@ object Cache {
                 if (player.rank > 120) oldPlayers++
                 when (team.teamid) {
                     "teamOne" -> {
-                        temp[player.name] =
-                            ServerInfo.Player(
+                        temp.add(
+                            PlayerCache(
                                 team = team.name,
                                 teamId = 1,
                                 rank = player.rank,
                                 platoon = player.platoon,
                                 pid = player.player_id,
                                 join_time = player.join_time,
-                                latency = player.latency
+                                latency = player.latency,
+                                id = player.name
                             )
+                        )
                         tempServerInfo = tempServerInfo?.copy(teamOneImgUrl = team.image)
                     }
 
                     "teamTwo" -> {
-                        temp[player.name] =
-                            ServerInfo.Player(
+                        temp.add(
+                            PlayerCache(
                                 team = team.name,
                                 teamId = 2,
                                 rank = player.rank,
                                 platoon = player.platoon,
                                 pid = player.player_id,
                                 join_time = player.join_time,
-                                latency = player.latency
+                                latency = player.latency,
+                                id = player.name
                             )
+                        )
                         tempServerInfo = tempServerInfo?.copy(teamTwoImgUrl = team.image)
                     }
 
@@ -205,31 +243,88 @@ object Cache {
                 }
                 if (isBot) {
                     bots++
-                    temp[player.name] = temp[player.name]!!.copy(isBot = true, botState = botState)
+                    temp.forEach {
+                        if (it.id == player.name){
+                            it.isBot = true
+                            it.botState = botState
+                        }
+                    }
                 } else {
                     players++
                 }
                 PlayerListInfo.forEach { (gameId, data) ->
                     if (gameId == gameID)
-                        data.forEach { (name, players) ->
-                            if (name == player.name) {
-                                if (players.isBot) {
-                                    temp[player.name] = data[name]!!.copy(
-                                        team = team.name,
-                                        isBot = true,
-                                        teamId = if (team.teamid == "teamOne") 1 else 2
-                                    )
+                        data.forEach { it ->
+                            if (it.id == player.name) {
+                                if (it.isBot) {
+                                    temp.forEach {
+                                        if (it.id == player.name){
+                                            it.team = team.name
+                                            it.teamId = if (team.teamid == "teamOne") 1 else 2
+                                            it.isBot = true
+                                        }
+                                    }
                                 } else {
-                                    temp[player.name] = data[name]!!.copy(
-                                        team = team.name,
-                                        teamId = if (team.teamid == "teamOne") 1 else 2
-                                    )
+                                    temp.forEach {
+                                        if (it.id == player.name){
+                                            it.team = team.name
+                                            it.teamId = if (team.teamid == "teamOne") 1 else 2
+                                            it.isBot = false
+                                        }
+                                    }
                                 }
                             }
                         }
                 }
             }
         }
+        PlayerListInfo.forEach { (gameId, data) ->
+            if (gameId == gameID){
+                if (data.size == 0 ){
+                    BotReportLog.botLog2 = mutableMapOf()
+                }
+                temp.forEach { t->
+                    val temp2 = mutableSetOf<String>()
+                    BotReportLog.botLog2.forEach { (gameid, data4) ->
+                        if (gameId == gameid){
+                            data4.forEach {
+                                temp2.add(it)
+                            }
+                        }
+                    }
+                    temp2.add(t.id)
+                    BotReportLog.botLog2[gameID] = temp2
+                    var isOnServer = false
+                    var join_time = 0L
+                    data.forEach {
+                        if (it.id == t.id) {
+                            isOnServer = true
+                        }else{
+                            join_time = it.join_time
+                        }
+                    }
+                    if (!isOnServer){
+                        val time = if (join_time / 1000 > 0) join_time / 1000 else System.currentTimeMillis()
+                        BotReportLog.botLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time)}] ID:${t.id}进入服务器 $gameID")
+                    }
+                }
+                data.forEach { d ->
+                    var isLeaveServer = true
+                    temp.forEach {
+                        if (it.id == d.id) isLeaveServer = false
+                    }
+                    if (isLeaveServer){
+                        BotReportLog.botLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis())}±15s] ID:${d.id}退出服务器 $gameID")
+                        BotReportLog.botLog2.forEach { (gameid, data4) ->
+                            if (gameId == gameid){
+                                data4.remove(d.id)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        BotReportLog.save()
         cacheLife = tempCacheLife
         if (PlayerListInfo[gameID] == null){
             PlayerListInfo[gameID] = temp

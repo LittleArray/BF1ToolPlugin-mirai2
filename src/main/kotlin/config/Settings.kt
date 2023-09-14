@@ -6,6 +6,8 @@ import net.mamoe.mirai.console.data.ValueDescription
 import net.mamoe.mirai.console.data.value
 
 object Setting : AutoSavePluginData("Setting") {
+    @ValueDescription("服务器Api端口")
+    val port:Int by value(2086)
     @ValueDescription("绑定的群数据(实验)")
     val groupData: MutableMap<Long, DataForGroup> by value()
 }

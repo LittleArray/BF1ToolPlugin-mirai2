@@ -34,6 +34,24 @@ object EnquiryService {
             }
         }
     }
+    fun bf1(I: PullIntent): Message {
+        val bF1Json = BF1Api.searchBF1()
+        if (bF1Json.isSuccessful){
+            var temp = "战地1当前活跃度\n"
+            bF1Json.regions?.forEach { reg, data ->
+                temp +="""
+                    地区:${reg} 
+                    --私服数量:${data.amounts.communityServerAmount}
+                    --官服数量:${data.amounts.diceServerAmount}
+                    --玩家数量:${data.amounts.soldierAmount}
+                    --观战数量:${data.amounts.spectatorAmount}
+                """.trimIndent()+"\n"
+            }
+            return temp.toPlainText()
+        }else{
+            return PlainText(CustomerLang.searchErr.replace("//action//", "战地一活跃度"))
+        }
+    }
 
     //TODO 查询自己实现
     suspend fun searchMe(I: PullIntent): Any {
@@ -105,7 +123,7 @@ object EnquiryService {
             }
             val wpModel = """
             <div class="item">
-                <p>NAME</p>
+                <p>NAME - STATS</p>
                 <img src="IMG">
                 <span>
                     <p>擊殺:KILLS</p>
@@ -121,7 +139,7 @@ object EnquiryService {
         """.trimIndent()
             val vpModel = """
             <div class="item">
-                <p>NAME</p>
+                <p>NAME - STATS</p>
                 <img src="IMG">
                 <span>
                     <p>擊殺:KILLS</p>
@@ -156,7 +174,8 @@ object EnquiryService {
                 if (index < 3) {
                     htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
                     wpText += wpModel
-                        .replace("KILLS", if (weapon.kills > 1000) "${weapon.kills.div(100)} ★" else "${weapon.kills}")
+                        .replace("STATS", if (weapon.kills > 100) "${weapon.kills.div(100)} ★" else "0 ★")
+                        .replace("KILLS", "${weapon.kills}")
                         .replace("NAME", weapon.weaponName)
                         .replace("-DKPM", weapon.killsPerMinute.toString())
                         .replace("-DVP", weapon.hitVKills.toString())
@@ -170,10 +189,8 @@ object EnquiryService {
                 if (index < 3) {
                     htmlToImage.cacheImg(vehicles.image, "Vehicles_${vehicles.vehicleName}")
                     vpText += vpModel
-                        .replace(
-                            "KILLS",
-                            if (vehicles.kills > 1000) "${vehicles.kills.div(100)} ★" else "${vehicles.kills}"
-                        )
+                        .replace("STATS", if (vehicles.kills > 100) "${vehicles.kills.div(100)} ★" else "0 ★")
+                        .replace("KILLS", "${vehicles.kills}")
                         .replace("NAME", vehicles.vehicleName)
                         .replace("-DKPM", vehicles.killsPerMinute.toString())
                         .replace("-DS", vehicles.destroyed.toString())
@@ -296,6 +313,7 @@ object EnquiryService {
         val typeI = when (type) {
             "*霰弹枪" -> "霰彈槍"
             "*轻机枪" -> "輕機槍"
+            "*机枪" -> "輕機槍"
             "*配备" -> "配備"
             "*半自动步枪" -> "半自動步槍"
             "*配枪" -> "佩槍"
@@ -368,7 +386,7 @@ object EnquiryService {
             }
             val wpModel = """
             <div class="item">
-                <p>NAME</p>
+                <p>NAME - STATS</p>
                 <img src="IMG">
                 <span>
                     <p>擊殺:KILLS</p>
@@ -388,14 +406,15 @@ object EnquiryService {
             var line4 = ""
             var weaponIndex = 0
             allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEach { weapon ->
-                if (weapon.weaponName.indexOf("三八") !=-1 ){
+                if (weapon.weaponName.indexOf("三八") != -1) {
                     weapon.type = "步槍"
                 }
                 if (typeI == weapon.type || typeI == null) {
                     weaponIndex++
                     htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
                     val temp = wpModel
-                        .replace("KILLS", if (weapon.kills > 1000) "${weapon.kills.div(100)} ★" else "${weapon.kills}")
+                        .replace("STATS", if (weapon.kills > 100) "${weapon.kills.div(100)} ★" else "0 ★")
+                        .replace("KILLS", "${weapon.kills}")
                         .replace("NAME", weapon.weaponName)
                         .replace("-DKPM", weapon.killsPerMinute.toString())
                         .replace("-DVP", weapon.hitVKills.toString())
@@ -480,7 +499,7 @@ object EnquiryService {
             }
             val vpModel = """
             <div class="item">
-                <p>NAME</p>
+                <p>NAME - STATS</p>
                 <img src="IMG">
                 <span>
                     <p>擊殺:KILLS</p>
@@ -499,10 +518,8 @@ object EnquiryService {
                 vehiclesIndex++
                 htmlToImage.cacheImg(vehicles.image, "Vehicles_${vehicles.vehicleName}")
                 val temp = vpModel
-                    .replace(
-                        "KILLS",
-                        if (vehicles.kills > 1000) "${vehicles.kills.div(100)} ★" else "${vehicles.kills}"
-                    )
+                    .replace("STATS", if (vehicles.kills > 100) "${vehicles.kills.div(100)} ★" else "0 ★")
+                    .replace("KILLS", "${vehicles.kills}")
                     .replace("NAME", vehicles.vehicleName)
                     .replace("-DKPM", vehicles.killsPerMinute.toString())
                     .replace("-DS", vehicles.destroyed.toString())
@@ -605,7 +622,7 @@ object EnquiryService {
                     val blackTeamSet: MutableSet<String> = mutableSetOf()
                     Cache.PlayerListInfo.forEach { gameID, players ->
                         if (gameid == gameID) {
-                            players.forEach { (id, data) ->
+                            players.forEach { data ->
                                 if (data.platoon.isNotEmpty()) {
                                     platoonSet.forEach {
                                         if (it == data.platoon) {
@@ -619,7 +636,7 @@ object EnquiryService {
                     }
                     Cache.PlayerListInfo.forEach { gameID, players ->
                         if (gameid == gameID)
-                            players.forEach { (id, it) ->
+                            players.forEach {
                                 var pa = ""
                                 if (it.platoon.isNotEmpty())
                                     pa = "[ ${it.platoon} ] "
@@ -650,16 +667,16 @@ object EnquiryService {
                                         }
                                     }
                                 }
-                                Setting.groupData[groupid]?.bindingData?.forEach {
-                                    if (it.value.indexOf(id, 0, true) != -1) {
+                                Setting.groupData[groupid]?.bindingData?.forEach {p->
+                                    if (p.value.indexOf(it.id, 0, true) != -1) {
                                         color = "pink"
                                         groupPlayer++
                                     }
                                 }
                                 run o@{
-                                    Setting.groupData[groupid]?.bindingData?.forEach {
+                                    Setting.groupData[groupid]?.bindingData?.forEach { p ->
                                         Setting.groupData[groupid]?.operator?.forEach { qq ->
-                                            if (it.key == qq && it.value.indexOf(id, 0, true) != -1) {
+                                            if (p.key == qq && p.value.indexOf(it.id, 0, true) != -1) {
                                                 color = "#f9767b"
                                                 opPlayer++
                                                 return@o
@@ -671,7 +688,7 @@ object EnquiryService {
                                     teamOneName = it.team
                                     team1Index++
                                     teamOne += player
-                                        .replace("NAME", "$pa$id")
+                                        .replace("NAME", "$pa${it.id}")
                                         .replace("RANK", it.rank.toString())
                                         .replace("INDEX", team1Index.toString())
                                         .replace(
@@ -697,7 +714,7 @@ object EnquiryService {
                                     teamTwoName = it.team
                                     team2Index++
                                     teamTwo += player
-                                        .replace("NAME", "$pa$id")
+                                        .replace("NAME", "$pa${it.id}")
                                         .replace("RANK", it.rank.toString())
                                         .replace("INDEX", team2Index.toString())
                                         .replace(

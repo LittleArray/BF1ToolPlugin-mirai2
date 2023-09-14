@@ -12,5 +12,7 @@ import top.ffshaozi.config.BotBlackList.provideDelegate
  */
 object BotReportLog: AutoSavePluginData("BotReportLog") {
     @ValueDescription("机器人反馈Log,勿动")
-    val botLog: MutableList<String> by value()
+    var botLog: MutableList<String> by value()
+    var botLog2: MutableMap<String, MutableSet<String>> by value(mutableMapOf())
+    var botLog3: String by value()
 }

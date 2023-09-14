@@ -200,17 +200,16 @@ object BF1Api {
     }
 
     //BotApi接口
-    fun postBot(
+    fun getBots(
         groupID: String,
-        url: String = "https://asoul.zj.cn/api/warm/status",
+        url: String = "https://asoul.zj.cn/api/starter/status/",
         isLog: Boolean = true
     ): PostResponse {
         return try {
             if (isLog)
                 Glogger.info("BotApi请求:${groupID}")
             val request = Request.Builder()
-                .url(url)
-                .post("{\"group\": \"${groupID}\"}".toRequestBody("application/json".toMediaType()))
+                .url("${url}$groupID")
                 .build()
 
             val response = okHttpClient.newCall(request).execute()
@@ -358,6 +357,17 @@ object BF1Api {
             Gson().fromJson(response.reqBody, ServerSearchJson::class.java).copy(isSuccessful = true)
         } else {
             ServerSearchJson(isSuccessful = false)
+        }
+    }
+    //战地一
+    fun searchBF1(): BF1Json {
+        val response =
+            getApi("https://api.gametools.network/bf1/status/?platform=pc",false)
+        return if (response.isSuccessful) {
+            //Glogger.info("请求成功转换数据中")
+            Gson().fromJson(response.reqBody, BF1Json::class.java).copy(isSuccessful = true)
+        } else {
+            BF1Json(isSuccessful = false)
         }
     }
 
