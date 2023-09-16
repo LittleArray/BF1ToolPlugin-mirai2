@@ -1,16 +1,16 @@
 package top.ffshaozi.intent
 
+import kotlinx.coroutines.runBlocking
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.toPlainText
+import top.ffshaozi.config.Bindings
 import top.ffshaozi.config.CustomerLang
 import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
-import top.ffshaozi.config.SettingController
 import top.ffshaozi.data.FullServerInfoJson
 import top.ffshaozi.utils.BF1Api
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.collections.HashMap
 
 /*** 服务器管理实现
  * @Description
@@ -23,29 +23,46 @@ object ServerManagement {
     fun kickPlayer(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*k <ID> <Reason>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return "不存在绑定的服务器".toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
-        val pid = BF1Api.getPersonaid(I.sp[1])
+        if (Setting.isNullServer(I.event.group.id)) return "不存在绑定的服务器".toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         var res = "\n"
-        Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
-            if (it.gameID.isNullOrEmpty() || it.sessionId.isNullOrEmpty()) {
-                if (re) CustomerLang.serverInfoRErr.toPlainText()
-                kickPlayer(I, true)
-                return CustomerLang.serverInfoRefreshing.toPlainText()
+        val kickR = when (I.sp[2]) {
+            "*tj" -> "禁止偷家"
+            "*zz" -> "禁止蜘蛛人"
+            "*ur" -> "違反規則"
+            "*nf" -> "nuan 服战神是吧"
+            else -> I.sp[2]
+        }
+        var player = 0
+        Cache.PlayerListInfo.forEach { pldata ->
+            if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                player++
             }
-            val kickR = when (I.sp[2]) {
-                "*tj" -> "禁止偷家"
-                "*zz" -> "禁止蜘蛛人"
-                "*ur" -> "違反規則"
-                "*nf" -> "nuan 服战神是吧"
-                else -> I.sp[2]
+        }
+        if (player > 1) {
+            var temp = "找到多个ID,无法确认\n"
+            Cache.PlayerListInfo.forEach { pldata ->
+                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                    temp += "ID:${pldata.id} 在 队伍${pldata.team}\n"
+                }
             }
-            val kickPlayer = BF1Api.kickPlayer(it.sessionId!!, it.gameID!!, pid.id.toString(), kickR)
-            res += if (kickPlayer.isSuccessful) {
-                CustomerLang.kickSucc.replace("//id//", I.sp[1]).replace("//serverCount//", "${index + 1}").replace("//res//", kickR)+"\n"
-            } else {
-                CustomerLang.kickErr.replace("//id//", I.sp[1]).replace("//err//", kickPlayer.reqBody)+"\n"
+            res += temp
+        } else if (player == 1) {
+            var result = "找不到此玩家"
+            Cache.PlayerListInfo.forEach { pldata ->
+                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                    runBlocking {
+                        result = if (pldata.kick(kickR).isSuccessful) {
+                            "踢出成功 ${pldata.id}"
+                        } else {
+                            "踢出失败 ${pldata.id}"
+                        }
+                    }
+                }
             }
+            res += result+"\n"
+        } else {
+            res += "找不到此玩家"
         }
         return res.toPlainText()
     }
@@ -54,9 +71,9 @@ object ServerManagement {
     fun banPlayer(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*b <ServerCount> <ID>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
             .toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
             if (index + 1 == serverCount) {
@@ -70,7 +87,7 @@ object ServerManagement {
                     CustomerLang.banSucc.replace("//id//", I.sp[2]).replace("//serverCount//", "$serverCount")
                         .toPlainText()
                 } else {
-                    SettingController.refreshServerInfo(I.event.group.id)
+                    Setting.refreshServerInfo(I.event.group.id)
                     CustomerLang.banErr.replace("//id//", I.sp[2]).replace("//err//", serverBan.reqBody).toPlainText()
                 }
             }
@@ -82,8 +99,8 @@ object ServerManagement {
     fun unBanPlayer(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*rb <ServerCount> <ID>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         val pid = BF1Api.getPersonaid(I.sp[2])
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
@@ -98,7 +115,7 @@ object ServerManagement {
                     CustomerLang.unBanSucc.replace("//serverCount//", "$serverCount").replace("//id//", I.sp[2])
                         .toPlainText()
                 } else {
-                    SettingController.refreshServerInfo(I.event.group.id)
+                    Setting.refreshServerInfo(I.event.group.id)
                     CustomerLang.unBanErr.replace("//id//", I.sp[2]).replace("//err//", serverBan.reqBody).toPlainText()
                 }
             }
@@ -109,8 +126,8 @@ object ServerManagement {
     //TODO 查询服务器Ban实现
     fun getBanList(I: PullIntent, re: Boolean = false): Message {
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*gb <ServerCount>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
             if (index + 1 == serverCount) {
@@ -127,7 +144,7 @@ object ServerManagement {
                     }
                     "服务器${serverCount}的Ban:\n$banStr".toPlainText()
                 } else {
-                    SettingController.refreshServerInfo(I.event.group.id)
+                    Setting.refreshServerInfo(I.event.group.id)
                     CustomerLang.searchErr.replace("//action//", "封禁列表").toPlainText()
                 }
             }
@@ -140,8 +157,8 @@ object ServerManagement {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*av <ServerCount> <ID> <Time>")
             .toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
             if (index + 1 == serverCount) {
@@ -153,7 +170,7 @@ object ServerManagement {
                 val serverVIP = BF1Api.addServerVIP(it.sessionId.toString(), it.serverRspID, I.sp[2])
                 if (serverVIP.isSuccessful || serverVIP.reqBody.indexOf("RspErrUserIsAlreadyVip") != -1) {
                     if (I.cmdSize > 2) {
-                        SettingController.addVip(I.event.group.id, serverCount, I.sp[2], I.sp[3])
+                        Setting.addVip(I.event.group.id, serverCount, I.sp[2], I.sp[3])
                         return CustomerLang.addVIPSucc
                             .replace("//id//", I.sp[2])
                             .replace("//serverCount//", "$serverCount")
@@ -166,7 +183,7 @@ object ServerManagement {
                         .replace("//Time//", "")
                         .toPlainText()
                 } else {
-                    SettingController.refreshServerInfo(I.event.group.id)
+                    Setting.refreshServerInfo(I.event.group.id)
                     return CustomerLang.addVIPErr.replace("//id//", I.sp[2]).replace("//err//", serverVIP.reqBody)
                         .toPlainText()
                 }
@@ -179,8 +196,8 @@ object ServerManagement {
     fun unVipPlayer(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*rv <ServerCount> <ID>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
             if (index + 1 == serverCount) {
@@ -197,7 +214,7 @@ object ServerManagement {
                 }
                 val serverVIP = BF1Api.removeServerVIP(it.sessionId.toString(), it.serverRspID, pid.id.toString())
                 if (serverVIP.isSuccessful) {
-                    SettingController.removeVip(I.event.group.id, serverCount, I.sp[2])
+                    Setting.removeVip(I.event.group.id, serverCount, I.sp[2])
                     return CustomerLang.unVIPSucc.replace("//id//", I.sp[2]).replace("//serverCount//", "$serverCount")
                         .toPlainText()
                 } else {
@@ -216,8 +233,8 @@ object ServerManagement {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*qt <ServerCount> <level>")
             .toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
             if (index + 1 == serverCount) {
@@ -261,53 +278,43 @@ object ServerManagement {
         }
         return CustomerLang.nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
+
     //TODO 换边实现
     fun movePlayer(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*hb <ServerCount> <ID>")
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*hb <ID>")
             .toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
-        val serverCount = I.sp[1].toInt()
-        Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
-            if (index + 1 == serverCount) {
-                if (it.gameID.isNullOrEmpty() || it.sessionId.isNullOrEmpty()) {
-                    if (re) return CustomerLang.serverInfoRErr.toPlainText()
-                    chooseLevel(I, re = true)
-                    return CustomerLang.serverInfoRefreshing.toPlainText()
-                }
-                val player:HashMap<String,Int> = hashMapOf()
-                Cache.PlayerListInfo[it.gameID!!]?.forEach{pldata->
-                    if (pldata.id.indexOf(I.sp[2],0,false) != -1) player[pldata.id] = pldata.teamId
-                }
-                if (player.size > 1){
-                    var temp = "找到多个ID,无法确认\n"
-                    player.forEach { id, team ->
-                        temp += "ID:${id} 在 队伍${team}\n"
-                    }
-                    return temp.toPlainText()
-                }else if (player.size == 1){
-                    var result = "换边失败"
-                    player.forEach { (id, team) ->
-                        val pid = BF1Api.getPersonaid(id)
-                        if (pid.isSuccessful) {
-                            if (Cache.PlayerListInfo[it.gameID!!]?.size == 64) {
-                                result = "换个锤子,人满了"
-                            }else{
-                                val movePlayer = BF1Api.movePlayer(it.sessionId!!, it.gameID!!, pid.id, if (team == 1) 2 else 1)
-                                if (movePlayer.isSuccessful){
-                                    result = "换边..成功了吗?如换 $id"
-                                }
-                            }
-                        }
-                    }
-                    return result.toPlainText()
-                }else {
-                    return "找不到此玩家".toPlainText()
-                }
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.toPlainText()
+        if (re) Setting.refreshServerInfo(I.event.group.id)
+        var player = 0
+        Cache.PlayerListInfo.forEach { pldata ->
+            if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                player++
             }
         }
-        return CustomerLang.nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
+        if (player > 1) {
+            var temp = "找到多个ID,无法确认\n"
+            Cache.PlayerListInfo.forEach { pldata ->
+                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                    temp += "ID:${pldata.id} 在 队伍${pldata.team}\n"
+                }
+            }
+            return temp.toPlainText()
+        } else if (player == 1) {
+            var result = "换边失败"
+            Cache.PlayerListInfo.forEach { pldata ->
+                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                    runBlocking {
+                        if (pldata.move().isSuccessful) {
+                            result = "换边..成功了吗?如换 ${pldata.id}"
+                        }
+                    }
+                }
+            }
+            return result.toPlainText()
+        } else {
+            return "找不到此玩家".toPlainText()
+        }
     }
 
     //TODO 查询VIP实现
@@ -453,14 +460,14 @@ object ServerManagement {
             "*setkd <ServerCount> <lkd/lkp/rkd/rkp> <Float>"
         )
             .toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
             .toPlainText()
         val serverCount = I.sp[1].toInt()
         when (I.sp[2]) {
-            "lkd" -> SettingController.setKD(I.event.group.id, serverCount, lifeMaxKD = I.sp[3].toFloat())
-            "lkp" -> SettingController.setKD(I.event.group.id, serverCount, lifeMaxKPM = I.sp[3].toFloat())
-            "rkp" -> SettingController.setKD(I.event.group.id, serverCount, recentlyMaxKPM = I.sp[3].toFloat())
-            "rkd" -> SettingController.setKD(I.event.group.id, serverCount, recentlyMaxKD = I.sp[3].toFloat())
+            "lkd" -> Setting.setKD(I.event.group.id, serverCount, lifeMaxKD = I.sp[3].toFloat())
+            "lkp" -> Setting.setKD(I.event.group.id, serverCount, lifeMaxKPM = I.sp[3].toFloat())
+            "rkp" -> Setting.setKD(I.event.group.id, serverCount, recentlyMaxKPM = I.sp[3].toFloat())
+            "rkd" -> Setting.setKD(I.event.group.id, serverCount, recentlyMaxKD = I.sp[3].toFloat())
             else -> return CustomerLang.parameterErr.replace(
                 "//para//",
                 "*setkd <ServerCount> <lkd/lkp/rkd/rkp> <Float>"
@@ -474,10 +481,10 @@ object ServerManagement {
     //TODO 修改服务器抗压白名单实现
     fun wl(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace("//err//", "")
             .toPlainText()
-        if (I.cmdSize < 2) return Setting.groupData[I.event.group.id]?.recentlyTempWhitelist.toString().toPlainText()
-        return if (SettingController.addWl(I.event.group.id, I.sp[1])) {
+        if (I.cmdSize < 2) return Bindings.recentlyTempWhitelist.toString().toPlainText()
+        return if (Setting.addWl(I.event.group.id, I.sp[1])) {
             "添加白名单成功".toPlainText()
         } else {
             "移除白名单成功".toPlainText()

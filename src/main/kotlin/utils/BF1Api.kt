@@ -5,7 +5,9 @@ import data.*
 import kotlinx.coroutines.runBlocking
 import net.mamoe.mirai.console.MiraiConsole
 import net.mamoe.mirai.console.rootDir
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -195,6 +197,56 @@ object BF1Api {
             if (isLog)
                 Glogger.error("数据Api请求出错${ex.stackTraceToString()}")
             PostResponse(isSuccessful = false, error = ex.stackTraceToString())
+        }
+
+    }
+
+    //22玩家列表数据接口
+    fun getPlayerListBy22(gameId: String,isLog:Boolean = true): PLBy22 {
+        try {
+            if (isLog)
+                Glogger.info("pl请求:${gameId}")
+            val url = "https://blaze.2788.pro/GameManager.getGameDataFromId"
+            val json = "{\"DNAM String\": \"csFullGameList\", \"GLST List<Integer>\": [$gameId]}"
+            val request = Request.Builder()
+                .url(url)
+                .post(json.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
+                .addHeader("Accept", "application/json")
+                .build()
+            val response = okHttpClient
+                .newBuilder()
+                .connectTimeout(15, TimeUnit.SECONDS)//设置连接超时时间
+                .readTimeout(15, TimeUnit.SECONDS)//设置读取超时时间
+                .build()
+                .newCall(request).execute()
+            if (response.isSuccessful) {
+                val res = response.body?.string()
+                if (res != null) {
+                    if (isLog)
+                        if (res.length > 32) Glogger.info("数据Api请求成功:${res.subSequence(0, 31)}") else Glogger.info("数据Api请求成功:${res}")
+                    val plBy22 = Gson().fromJson(res, PLBy22::class.java)
+                    return plBy22.copy(isSuccessful = true)
+                } else {
+                    if (isLog)
+                        Glogger.error("数据Api请求失败")
+                    return PLBy22(isSuccessful = false)
+                }
+            } else {
+                val res = response.body?.string()
+                if (res != null) {
+                    if (isLog)
+                        Glogger.error("数据Api请求失败:${res}")
+                    return PLBy22(isSuccessful = false)
+                } else {
+                    if (isLog)
+                        Glogger.error("数据Api请求失败")
+                    return PLBy22(isSuccessful = false)
+                }
+            }
+        } catch (ex: Exception) {
+            if (isLog)
+                Glogger.error("数据Api请求出错${ex.stackTraceToString()}")
+            return PLBy22(isSuccessful = false)
         }
 
     }

@@ -29,15 +29,7 @@ object ServerApi {
         app.post("/api/v1/chat/{GameId}") { ctx ->
             val gameId = ctx.pathParam("GameId")
             NeriQQBot.Glogger.warning("$gameId ${ctx.body()}")
-            NeriQQBot.GlobalBots.forEach { bot ->
-                CycleTask.serverInfoIterator { groupID, data, index, serverInfoForSave ->
-                    if (serverInfoForSave.gameID == gameId) {
-                        CoroutineScope(Dispatchers.IO).launch {
-                            bot.getGroup(groupID)?.sendMessage("$index 服消息转发\n${ctx.body()}")
-                        }
-                    }
-                }
-            }
+            Cache.sendMessage(gameId, "//SC//服消息转发\n${ctx.body()}")
             ctx.status(200)
         }
         //Api保活

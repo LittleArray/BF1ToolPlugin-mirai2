@@ -7,7 +7,6 @@ import top.ffshaozi.NeriQQBot
 import top.ffshaozi.config.DataForGroup
 import top.ffshaozi.config.Setting
 import top.ffshaozi.config.Setting.groupData
-import top.ffshaozi.config.SettingController
 import top.ffshaozi.intent.Cache.BotGroups
 
 // 简单指令
@@ -26,7 +25,7 @@ object BF1Cmd : CompositeCommand(
         if (opId == null) {
             sendMessage("${groupData[groupId]?.operator}")
         } else {
-            groupId?.let { SettingController.setOperator(opId, it) }
+            groupId?.let { Setting.setOperator(opId, it) }
         }
     }
 

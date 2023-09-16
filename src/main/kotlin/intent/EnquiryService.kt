@@ -1,13 +1,12 @@
 package top.ffshaozi.intent
 
 import kotlinx.coroutines.*
-import net.mamoe.mirai.contact.Contact.Companion.sendImage
 import net.mamoe.mirai.contact.Contact.Companion.uploadImage
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.*
+import top.ffshaozi.config.Bindings
 import top.ffshaozi.config.CustomerLang
 import top.ffshaozi.config.Setting
-import top.ffshaozi.config.SettingController
 import top.ffshaozi.utils.*
 import java.io.File
 import java.text.SimpleDateFormat
@@ -22,11 +21,11 @@ object EnquiryService {
     //TODO 绑定实现
     fun bindingUser(I: PullIntent): Message {
         return if (I.cmdSize > 1) {//绑定操作
-            SettingController.addBinding(I.event.group.id, I.event.sender.id, I.sp[1])
+            Setting.addBinding(I.event.group.id, I.event.sender.id, I.sp[1])
             PlainText(CustomerLang.bindingSucc.replace("//id//", I.sp[1]))
         } else {
             //解绑操作
-            val temp = SettingController.removeBinding(I.event.group.id, I.event.sender.id)
+            val temp = Setting.removeBinding(I.event.group.id, I.event.sender.id)
             if (temp != null) {
                 PlainText(CustomerLang.unbindingSucc.replace("//id//", I.event.sender.nameCardOrNick))
             } else {
@@ -34,32 +33,33 @@ object EnquiryService {
             }
         }
     }
+
     fun bf1(I: PullIntent): Message {
         val bF1Json = BF1Api.searchBF1()
-        if (bF1Json.isSuccessful){
+        if (bF1Json.isSuccessful) {
             var temp = "战地1当前活跃度\n"
             bF1Json.regions?.forEach { reg, data ->
-                temp +="""
+                temp += """
                     地区:${reg} 
                     --私服数量:${data.amounts.communityServerAmount}
                     --官服数量:${data.amounts.diceServerAmount}
                     --玩家数量:${data.amounts.soldierAmount}
                     --观战数量:${data.amounts.spectatorAmount}
-                """.trimIndent()+"\n"
+                """.trimIndent() + "\n"
             }
             return temp.toPlainText()
-        }else{
+        } else {
             return PlainText(CustomerLang.searchErr.replace("//action//", "战地一活跃度"))
         }
     }
 
     //TODO 查询自己实现
     suspend fun searchMe(I: PullIntent): Any {
-        var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            SettingController.addBinding(I.event.group.id, I.event.sender.id, id)
+            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -251,11 +251,11 @@ object EnquiryService {
 
     //TODO 查询BFEAC的实现
     fun searchEACBan(I: PullIntent): Message {
-        var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            SettingController.addBinding(I.event.group.id, I.event.sender.id, id)
+            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -276,11 +276,11 @@ object EnquiryService {
 
     //TODO 最近实现
     fun searchRecently(I: PullIntent): Message {
-        var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            SettingController.addBinding(I.event.group.id, I.event.sender.id, id)
+            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -329,11 +329,11 @@ object EnquiryService {
             "*冲锋枪" -> "衝鋒槍"
             else -> null
         }
-        var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            SettingController.addBinding(I.event.group.id, I.event.sender.id, id)
+            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -442,11 +442,11 @@ object EnquiryService {
 
     //TODO 查询载具实现
     suspend fun searchVehicle(I: PullIntent): Message {
-        var id = SettingController.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            SettingController.addBinding(I.event.group.id, I.event.sender.id, id)
+            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -575,12 +575,12 @@ object EnquiryService {
     //TODO 查询服务器玩家列表的实现
     fun searchServerList(I: PullIntent, re: Boolean = false): Message {
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*pl <ServerCount>").toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
             "//err//",
             ""
         )
             .toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val index = I.sp[1].toInt()
         var msg: Message = PlainText(CustomerLang.searchErr.replace("//action//", "玩家列表"))
         val team1 = ForwardMessageBuilder(I.event.group)
@@ -589,7 +589,8 @@ object EnquiryService {
         team2.add(I.event.bot, PlainText("队伍2"))
         val blackTeam = ForwardMessageBuilder(I.event.group)
         blackTeam.add(I.event.bot, PlainText("黑队查询"))
-        CycleTask.serverInfoIterator { groupID, data, serverCount, serverInfoForSave ->
+        var gameid = ""
+        Cache.serverInfoIterator { groupID, data, serverCount, serverInfoForSave ->
             run p@{
                 if (index == serverCount) {
                     if (serverInfoForSave.gameID.isNullOrEmpty()) {
@@ -601,200 +602,201 @@ object EnquiryService {
                         msg = CustomerLang.serverInfoRefreshing.toPlainText()
                         return@p
                     }
-                    val gameid = serverInfoForSave.gameID!!
-                    val groupid = I.event.group.id
-                    var groupPlayer = 0
-                    var opPlayer = 0
-                    var blackPlayer = 0
-                    var loadingBots = 0
-                    var teamOne = ""
-                    var teamOneName = ""
-                    var team1Index = 0
-                    var teamTwo = ""
-                    var teamTwoName = ""
-                    var team2Index = 0
-                    val htmlToImage = HtmlToImage()
-                    val text = htmlToImage.readIt("playerList")
-                    //background-color: rgb(86, 196, 73);
-                    val player =
-                        "<div class=\"player\"><div class=\"index\">INDEX</div><div class=\"rank\"  style=\"rankback\">RANK</div><div class=\"black\">BLACK_TEXT</div><div style=\"color: #fff;id\" class=\"name\">NAME</div><div style=\"color: #fff;lkd\" class=\"lifeKD\">LIFE_KD</div><div style=\"color: #fff;lkp\" class=\"lifeKPM\">LIFE_KPM</div><div style=\"color: #fff;rkd\" class=\"RKD\">R_KD</div><div style=\"color: #fff;rkp\" class=\"RKPM\">R_KPM</div><div class=\"time\">TIME分</div><div class=\"latency\">PINGms</div></div>"
-                    val platoonSet: MutableSet<String> = mutableSetOf()
-                    val blackTeamSet: MutableSet<String> = mutableSetOf()
-                    Cache.PlayerListInfo.forEach { gameID, players ->
-                        if (gameid == gameID) {
-                            players.forEach { data ->
-                                if (data.platoon.isNotEmpty()) {
-                                    platoonSet.forEach {
-                                        if (it == data.platoon) {
-                                            blackTeamSet.add(it)
-                                        }
-                                    }
-                                    platoonSet.add(data.platoon)
-                                }
-                            }
-                        }
-                    }
-                    Cache.PlayerListInfo.forEach { gameID, players ->
-                        if (gameid == gameID)
-                            players.forEach {
-                                var pa = ""
-                                if (it.platoon.isNotEmpty())
-                                    pa = "[ ${it.platoon} ] "
-
-                                var color = "#fff"
-                                var blackText = ""
-                                var colorlkd = "#fff"
-                                var colorlkp = "#fff"
-                                var colorrkp = "#fff"
-                                var colorrkd = "#fff"
-                                if (it.lkd > serverInfoForSave.lifeMaxKD * 0.6) colorlkd = "#ff0"
-                                if (it.lkp > serverInfoForSave.lifeMaxKPM * 0.6) colorlkp = "#ff0"
-                                if (it.rkp > serverInfoForSave.recentlyMaxKPM * 0.6) colorrkp = "#ff0"
-                                if (it.rkd > serverInfoForSave.recentlyMaxKD * 0.6) colorrkd = "#ff0"
-                                if (it.lkd > serverInfoForSave.lifeMaxKD * 0.8) colorlkd = "#ff6600"
-                                if (it.lkp > serverInfoForSave.lifeMaxKPM * 0.8) colorlkp = "#ff6600"
-                                if (it.rkp > serverInfoForSave.recentlyMaxKPM * 0.8) colorrkp = "#ff6600"
-                                if (it.rkd > serverInfoForSave.recentlyMaxKD * 0.8) colorrkd = "#ff6600"
-                                if (it.isBot) {
-                                    color = "aqua"
-                                    if (it.botState == "Loading") loadingBots++
-                                }
-                                blackTeamSet.forEach { pa ->
-                                    if (it.platoon == pa) {
-                                        if (!it.isBot) {
-                                            blackText = "[!]"
-                                            blackPlayer++
-                                        }
-                                    }
-                                }
-                                Setting.groupData[groupid]?.bindingData?.forEach {p->
-                                    if (p.value.indexOf(it.id, 0, true) != -1) {
-                                        color = "pink"
-                                        groupPlayer++
-                                    }
-                                }
-                                run o@{
-                                    Setting.groupData[groupid]?.bindingData?.forEach { p ->
-                                        Setting.groupData[groupid]?.operator?.forEach { qq ->
-                                            if (p.key == qq && p.value.indexOf(it.id, 0, true) != -1) {
-                                                color = "#f9767b"
-                                                opPlayer++
-                                                return@o
-                                            }
-                                        }
-                                    }
-                                }
-                                if (it.teamId == 1) {
-                                    teamOneName = it.team
-                                    team1Index++
-                                    teamOne += player
-                                        .replace("NAME", "$pa${it.id}")
-                                        .replace("RANK", it.rank.toString())
-                                        .replace("INDEX", team1Index.toString())
-                                        .replace(
-                                            "TIME",
-                                            "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
-                                        )
-                                        .replace("PING", "${it.latency}")
-                                        .replace("LIFE_KD", "${it.lkd}")
-                                        .replace("LIFE_KPM", "${it.lkp}")
-                                        .replace("R_KD", "${it.rkd}")
-                                        .replace("R_KPM", "${it.rkp}")
-                                        .replace("BLACK_TEXT", blackText)
-                                        .replace("color: #fff;id", "color: ${color};")
-                                        .replace("color: #fff;lkd", "color: ${colorlkd};")
-                                        .replace("color: #fff;lkp", "color: ${colorlkp};")
-                                        .replace("color: #fff;rkp", "color: ${colorrkp};")
-                                        .replace("color: #fff;rkd", "color: ${colorrkd};")
-                                        .replace(
-                                            "rankback",
-                                            if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
-                                        )
-                                } else {
-                                    teamTwoName = it.team
-                                    team2Index++
-                                    teamTwo += player
-                                        .replace("NAME", "$pa${it.id}")
-                                        .replace("RANK", it.rank.toString())
-                                        .replace("INDEX", team2Index.toString())
-                                        .replace(
-                                            "TIME",
-                                            "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
-                                        )
-                                        .replace("PING", "${it.latency}")
-                                        .replace("LIFE_KD", "${it.lkd}")
-                                        .replace("LIFE_KPM", "${it.lkp}")
-                                        .replace("R_KD", "${it.rkd}")
-                                        .replace("R_KPM", "${it.rkp}")
-                                        .replace("BLACK_TEXT", blackText)
-                                        .replace("color: #fff;id", "color: ${color};")
-                                        .replace("color: #fff;lkd", "color: ${colorlkd};")
-                                        .replace("color: #fff;lkp", "color: ${colorlkp};")
-                                        .replace("color: #fff;rkp", "color: ${colorrkp};")
-                                        .replace("color: #fff;rkd", "color: ${colorrkd};")
-                                        .replace(
-                                            "rankback",
-                                            if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
-                                        )
-                                }
-                            }
-                    }
-                    var mapName = Cache.ServerInfoList[gameid]!!.map
-                    Cache.mapCache.forEach {
-                        if (Cache.ServerInfoList[gameid]!!.map == it.key)
-                            mapName = it.value
-                    }
-                    var modeName = Cache.ServerInfoList[gameid]!!.mode
-                    Cache.modeCache.forEach {
-                        if (Cache.ServerInfoList[gameid]!!.mode == it.key)
-                            modeName = it.value
-                    }
-
-                    val teamOneImg =
-                        if (htmlToImage.cacheImg(Cache.ServerInfoList[gameid]!!.teamOneImgUrl, teamOneName)) {
-                            htmlToImage.getImgPath()
-                        } else {
-                            ""
-                        }
-                    val teamTwoImg =
-                        if (htmlToImage.cacheImg(Cache.ServerInfoList[gameid]!!.teamTwoImgUrl, teamTwoName)) {
-                            htmlToImage.getImgPath()
-                        } else {
-                            ""
-                        }
-                    val res = text
-                        .replace("Team1Replace", teamOne)
-                        .replace("Team2Replace", teamTwo)
-                        .replace("-DPREFIX", Cache.ServerInfoList[gameid]!!.perfix)
-                        .replace("-DTEAM1PIC", teamOneImg)
-                        .replace("-DTEAM2PIC", teamTwoImg)
-                        .replace("-DMODE", modeName)
-                        .replace("-DMAP", mapName)
-                        .replace("-DMP_back", Cache.ServerInfoList[gameid]!!.map)
-                        .replace(
-                            "-DTIME",
-                            SimpleDateFormat("MM-dd HH:mm:ss").format(Cache.ServerInfoList[gameid]!!.cacheTime)
-                        )
-                        .replace("-DLBPL", Cache.ServerInfoList[gameid]!!.oldPlayers.toString())
-                        .replace("-DBOPL", Cache.ServerInfoList[gameid]!!.bots.toString())
-                        .replace("-DGOPL", groupPlayer.toString())
-                        .replace("-DOPPL", opPlayer.toString())
-                        .replace("-BOTSL", loadingBots.toString())
-                        .replace("-DBLPL", blackPlayer.toString())
-                        .replace("-DTEAM1NAME", teamOneName)
-                        .replace("-DTEAM2NAME", teamTwoName)
-                        .replace("-DP", Cache.ServerInfoList[gameid]!!.players.toString())
-                        .replace("-DGameID", gameid)
-                        .replace("-DGameID", gameid)
-
-                    htmlToImage.writeTempFile(res)
-                    htmlToImage.toImage()
-                    runBlocking {
-                        msg = I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
-                    }
-
+                    gameid = serverInfoForSave.gameID!!
+                    return@p
                 }
             }
+        }
+        if (gameid.isEmpty()) return msg
+        var groupPlayer = 0
+        var opPlayer = 0
+        var blackPlayer = 0
+        var loadingBots = 0
+        var teamOne = ""
+        var teamOneName = ""
+        var team1Index = 0
+        var teamTwo = ""
+        var teamTwoName = ""
+        var team2Index = 0
+        var loading = 0
+        val htmlToImage = HtmlToImage()
+        val text = htmlToImage.readIt("playerList")
+        //background-color: rgb(86, 196, 73);
+        val player =
+            "<div class=\"player\"><div class=\"index\">INDEX</div><div class=\"rank\"  style=\"rankback\">RANK</div><div class=\"black\">BLACK_TEXT</div><div style=\"color: #fff;id\" class=\"name\">NAME</div><div style=\"color: #fff;lkd\" class=\"lifeKD\">LIFE_KD</div><div style=\"color: #fff;lkp\" class=\"lifeKPM\">LIFE_KPM</div><div style=\"color: #fff;rkd\" class=\"RKD\">R_KD</div><div style=\"color: #fff;rkp\" class=\"RKPM\">R_KPM</div><div class=\"time\">TIME分</div><div class=\"latency\">PINGms</div></div>"
+        val platoonSet: MutableSet<String> = mutableSetOf()
+        val blackTeamSet: MutableSet<String> = mutableSetOf()
+        Cache.PlayerListInfo.forEach { players ->
+            if (gameid == players.gameID) {
+                players.platoonList.forEach {
+                    platoonSet.forEach {
+                        players.platoonList.forEach {p->
+                            if (it == p) {
+                                blackTeamSet.add(players.id)
+
+                            }
+                        }
+                    }
+                    platoonSet.add(it)
+                }
+            }
+        }
+        Cache.PlayerListInfo.sortedByDescending { it.join_time }.reversed().forEach {
+            if (gameid != it.gameID) return@forEach
+            var pa = ""
+            if (it.platoon.isNotEmpty())
+                pa = "[ ${it.platoon} ] "
+
+            var color = "#fff"
+            var blackText = ""
+            var colorlkd = "#fff"
+            var colorlkp = "#fff"
+            var colorrkp = "#fff"
+            var colorrkd = "#fff"
+            if (it.lkd > it.lifeMaxKD * 0.6) colorlkd = "#ff0"
+            if (it.lkp > it.lifeMaxKPM * 0.6) colorlkp = "#ff0"
+            if (it.rkp > it.recentlyMaxKPM * 0.6) colorrkp = "#ff0"
+            if (it.rkd > it.recentlyMaxKD * 0.6) colorrkd = "#ff0"
+            if (it.lkd > it.lifeMaxKD * 0.8) colorlkd = "#ff6600"
+            if (it.lkp > it.lifeMaxKPM * 0.8) colorlkp = "#ff6600"
+            if (it.rkp > it.recentlyMaxKPM * 0.8) colorrkp = "#ff6600"
+            if (it.rkd > it.recentlyMaxKD * 0.8) colorrkd = "#ff6600"
+            if (it.isBot) {
+                color = "aqua"
+                if (it.botState == "Loading") loadingBots++
+            }
+            blackTeamSet.forEach { pa ->
+                if (it.id == pa) {
+                    if (!it.isBot) {
+                        blackText = "[!]"
+                        blackPlayer++
+                    }
+                }
+            }
+            Bindings.bindingData.forEach { p ->
+                if (p.value.indexOf(it.id, 0, true) != -1) {
+                    color = "pink"
+                    groupPlayer++
+                }
+            }
+            run o@{
+                val sp = Cache.ServerInfoList[gameid]!!.opPlayers.split(";")
+                sp.forEach { sp ->
+                    if (it.pid == sp.toLong()) {
+                        color = "#f9767b"
+                        opPlayer++
+                        return@o
+                    }
+                }
+            }
+            if (it.teamId == 0) {
+                teamOneName = it.team
+                team1Index++
+                teamOne += player
+                    .replace("NAME", "$pa${it.id}")
+                    .replace("RANK", it.rank.toString())
+                    .replace("INDEX", team1Index.toString())
+                    .replace(
+                        "TIME",
+                        "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
+                    )
+                    .replace("PING", "${it.latency}")
+                    .replace("LIFE_KD", "${it.lkd}")
+                    .replace("LIFE_KPM", "${it.lkp}")
+                    .replace("R_KD", "${it.rkd}")
+                    .replace("R_KPM", "${it.rkp}")
+                    .replace("BLACK_TEXT", blackText)
+                    .replace("color: #fff;id", "color: ${color};")
+                    .replace("color: #fff;lkd", "color: ${colorlkd};")
+                    .replace("color: #fff;lkp", "color: ${colorlkp};")
+                    .replace("color: #fff;rkp", "color: ${colorrkp};")
+                    .replace("color: #fff;rkd", "color: ${colorrkd};")
+                    .replace(
+                        "rankback",
+                        if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
+                    )
+            } else if (it.teamId == 1) {
+                teamTwoName = it.team
+                team2Index++
+                teamTwo += player
+                    .replace("NAME", "$pa${it.id}")
+                    .replace("RANK", it.rank.toString())
+                    .replace("INDEX", team2Index.toString())
+                    .replace(
+                        "TIME",
+                        "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
+                    )
+                    .replace("PING", "${it.latency}")
+                    .replace("LIFE_KD", "${it.lkd}")
+                    .replace("LIFE_KPM", "${it.lkp}")
+                    .replace("R_KD", "${it.rkd}")
+                    .replace("R_KPM", "${it.rkp}")
+                    .replace("BLACK_TEXT", blackText)
+                    .replace("color: #fff;id", "color: ${color};")
+                    .replace("color: #fff;lkd", "color: ${colorlkd};")
+                    .replace("color: #fff;lkp", "color: ${colorlkp};")
+                    .replace("color: #fff;rkp", "color: ${colorrkp};")
+                    .replace("color: #fff;rkd", "color: ${colorrkd};")
+                    .replace(
+                        "rankback",
+                        if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
+                    )
+            } else {
+                loading++
+            }
+        }
+        var mapName = Cache.ServerInfoList[gameid]!!.map
+        Cache.mapCache.forEach {
+            if (Cache.ServerInfoList[gameid]!!.map == it.key)
+                mapName = it.value
+        }
+        var modeName = Cache.ServerInfoList[gameid]!!.mode
+        Cache.modeCache.forEach {
+            if (Cache.ServerInfoList[gameid]!!.mode == it.key)
+                modeName = it.value
+        }
+
+        val teamOneImg =
+            if (htmlToImage.cacheImg(Cache.ServerInfoList[gameid]!!.teamOneImgUrl, teamOneName)) {
+                htmlToImage.getImgPath()
+            } else {
+                ""
+            }
+        val teamTwoImg =
+            if (htmlToImage.cacheImg(Cache.ServerInfoList[gameid]!!.teamTwoImgUrl, teamTwoName)) {
+                htmlToImage.getImgPath()
+            } else {
+                ""
+            }
+        val res = text
+            .replace("Team1Replace", teamOne)
+            .replace("Team2Replace", teamTwo)
+            .replace("-DPREFIX", Cache.ServerInfoList[gameid]!!.perfix)
+            .replace("-DTEAM1PIC", teamOneImg)
+            .replace("-DTEAM2PIC", teamTwoImg)
+            .replace("-DMODE", modeName)
+            .replace("-DMAP", mapName)
+            .replace("-DMP_back", Cache.ServerInfoList[gameid]!!.map)
+            .replace(
+                "-DTIME",
+                SimpleDateFormat("MM-dd HH:mm:ss").format(Cache.ServerInfoList[gameid]!!.cacheTime)
+            )
+            .replace("-DLBPL", Cache.ServerInfoList[gameid]!!.oldPlayers.toString())
+            .replace("-DBOPL", Cache.ServerInfoList[gameid]!!.bots.toString())
+            .replace("-DGOPL", groupPlayer.toString())
+            .replace("-DOPPL", opPlayer.toString())
+            .replace("-BOTSL", loading.toString())
+            .replace("-DBLPL", blackPlayer.toString())
+            .replace("-DTEAM1NAME", teamOneName)
+            .replace("-DTEAM2NAME", teamTwoName)
+            .replace("-DP", Cache.ServerInfoList[gameid]!!.players.toString())
+            .replace("-DGameID", gameid)
+            .replace("-DGameID", gameid)
+
+        htmlToImage.writeTempFile(res)
+        htmlToImage.toImage()
+        runBlocking {
+            msg = I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
         }
         return msg
     }
@@ -804,12 +806,12 @@ object EnquiryService {
     fun searchServerListPlayer(I: PullIntent, re: Boolean = false): Message {
         if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*ssi <ServerCount> <ID>")
             .toPlainText()
-        if (SettingController.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
+        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
             "//err//",
             ""
         )
             .toPlainText()
-        if (re) SettingController.refreshServerInfo(I.event.group.id)
+        if (re) Setting.refreshServerInfo(I.event.group.id)
         val serverCount = I.sp[1].toInt()
         Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
             if (index + 1 == serverCount) {
