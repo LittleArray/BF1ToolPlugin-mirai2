@@ -6,6 +6,7 @@ import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.*
 import top.ffshaozi.config.Bindings
 import top.ffshaozi.config.CustomerLang
+import top.ffshaozi.config.ServerInfos
 import top.ffshaozi.config.Setting
 import top.ffshaozi.utils.*
 import java.io.File
@@ -21,11 +22,11 @@ object EnquiryService {
     //TODO 绑定实现
     fun bindingUser(I: PullIntent): Message {
         return if (I.cmdSize > 1) {//绑定操作
-            Setting.addBinding(I.event.group.id, I.event.sender.id, I.sp[1])
+            Bindings.addBinding(I.event.group.id, I.event.sender.id, I.sp[1])
             PlainText(CustomerLang.bindingSucc.replace("//id//", I.sp[1]))
         } else {
             //解绑操作
-            val temp = Setting.removeBinding(I.event.group.id, I.event.sender.id)
+            val temp = Bindings.removeBinding(I.event.group.id, I.event.sender.id)
             if (temp != null) {
                 PlainText(CustomerLang.unbindingSucc.replace("//id//", I.event.sender.nameCardOrNick))
             } else {
@@ -55,11 +56,11 @@ object EnquiryService {
 
     //TODO 查询自己实现
     suspend fun searchMe(I: PullIntent): Any {
-        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
+            Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -251,11 +252,11 @@ object EnquiryService {
 
     //TODO 查询BFEAC的实现
     fun searchEACBan(I: PullIntent): Message {
-        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
+            Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -276,11 +277,11 @@ object EnquiryService {
 
     //TODO 最近实现
     fun searchRecently(I: PullIntent): Message {
-        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
+            Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -329,11 +330,11 @@ object EnquiryService {
             "*冲锋枪" -> "衝鋒槍"
             else -> null
         }
-        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
+            Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -442,11 +443,11 @@ object EnquiryService {
 
     //TODO 查询载具实现
     suspend fun searchVehicle(I: PullIntent): Message {
-        var id = Setting.getBinding(I.event.group.id, I.event.sender.id)
+        var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
-            Setting.addBinding(I.event.group.id, I.event.sender.id, id)
+            Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
             Intent.sendMsg(I, CustomerLang.unbindingErr.replace("//id//", id))
         }
         //查询
@@ -573,15 +574,9 @@ object EnquiryService {
     }
 
     //TODO 查询服务器玩家列表的实现
-    fun searchServerList(I: PullIntent, re: Boolean = false): Message {
+    fun searchServerList(I: PullIntent): Message {
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*pl <ServerCount>").toPlainText()
-        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
-            "//err//",
-            ""
-        )
-            .toPlainText()
-        if (re) Setting.refreshServerInfo(I.event.group.id)
-        val index = I.sp[1].toInt()
+        val name = I.sp[1]
         var msg: Message = PlainText(CustomerLang.searchErr.replace("//action//", "玩家列表"))
         val team1 = ForwardMessageBuilder(I.event.group)
         team1.add(I.event.bot, PlainText("队伍1"))
@@ -589,24 +584,7 @@ object EnquiryService {
         team2.add(I.event.bot, PlainText("队伍2"))
         val blackTeam = ForwardMessageBuilder(I.event.group)
         blackTeam.add(I.event.bot, PlainText("黑队查询"))
-        var gameid = ""
-        Cache.serverInfoIterator { groupID, data, serverCount, serverInfoForSave ->
-            run p@{
-                if (index == serverCount) {
-                    if (serverInfoForSave.gameID.isNullOrEmpty()) {
-                        if (re) {
-                            msg = CustomerLang.serverInfoRErr.toPlainText()
-                            return@p
-                        }
-                        searchServerList(I, re = true)
-                        msg = CustomerLang.serverInfoRefreshing.toPlainText()
-                        return@p
-                    }
-                    gameid = serverInfoForSave.gameID!!
-                    return@p
-                }
-            }
-        }
+        val gameid = ServerInfos.getGameIDByName(I.event.group.id,name)
         if (gameid.isEmpty()) return msg
         var groupPlayer = 0
         var opPlayer = 0
@@ -618,7 +596,6 @@ object EnquiryService {
         var teamTwo = ""
         var teamTwoName = ""
         var team2Index = 0
-        var loading = 0
         val htmlToImage = HtmlToImage()
         val text = htmlToImage.readIt("playerList")
         //background-color: rgb(86, 196, 73);
@@ -742,7 +719,7 @@ object EnquiryService {
                         if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
                     )
             } else {
-                loading++
+
             }
         }
         var mapName = Cache.ServerInfoList[gameid]!!.map
@@ -782,10 +759,11 @@ object EnquiryService {
                 SimpleDateFormat("MM-dd HH:mm:ss").format(Cache.ServerInfoList[gameid]!!.cacheTime)
             )
             .replace("-DLBPL", Cache.ServerInfoList[gameid]!!.oldPlayers.toString())
+            .replace("-DSPL", Cache.ServerInfoList[gameid]!!.spectatorPlayers.toString())
             .replace("-DBOPL", Cache.ServerInfoList[gameid]!!.bots.toString())
             .replace("-DGOPL", groupPlayer.toString())
             .replace("-DOPPL", opPlayer.toString())
-            .replace("-BOTSL", loading.toString())
+            .replace("-BOTSL", Cache.ServerInfoList[gameid]!!.loadingPlayers.toString())
             .replace("-DBLPL", blackPlayer.toString())
             .replace("-DTEAM1NAME", teamOneName)
             .replace("-DTEAM2NAME", teamTwoName)
@@ -803,43 +781,24 @@ object EnquiryService {
 
 
     //TODO 搜索服务器玩家
-    fun searchServerListPlayer(I: PullIntent, re: Boolean = false): Message {
-        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*ssi <ServerCount> <ID>")
-            .toPlainText()
-        if (Setting.isNullServer(I.event.group.id)) return CustomerLang.nullServerErr.replace(
-            "//err//",
-            ""
-        )
-            .toPlainText()
-        if (re) Setting.refreshServerInfo(I.event.group.id)
-        val serverCount = I.sp[1].toInt()
-        Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
-            if (index + 1 == serverCount) {
-                if (it.gameID.isNullOrEmpty()) {
-                    if (re) return CustomerLang.serverInfoRErr.toPlainText()
-                    searchServerListPlayer(I, re = true)
-                    return CustomerLang.serverInfoRefreshing.toPlainText()
-                }
-                Intent.sendMsg(
-                    I,
-                    CustomerLang.searching.replace("//id//", I.sp[2]).replace("//action//", "服务器玩家")
-                )
-                val serverListJson = BF1Api.searchServerList(it.gameID!!)
-                return if (serverListJson.isSuccessful == true) {
-                    var p = "在服务器${serverCount}中查找到\n"
-                    serverListJson.teams?.forEach { team ->
-                        team.players.forEach {
-                            if (it.name.indexOf(I.sp[2], 0, true) != -1) {
-                                p += "ID:${it.name} 所在队伍:${team.name}\n"
-                            }
-                        }
+    fun searchServerListPlayer(I: PullIntent): Message {
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*ssi <ServerCount> <ID>").toPlainText()
+        val name =  I.sp[1]
+        val gameID = ServerInfos.getGameIDByName(I.event.group.id,name)
+        if (gameID.isBlank()) return  CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        val serverListJson = BF1Api.searchServerList(gameID)
+        return if (serverListJson.isSuccessful == true) {
+            var p = "在服务器${name}中查找到\n"
+            serverListJson.teams?.forEach { team ->
+                team.players.forEach {
+                    if (it.name.indexOf(I.sp[2], 0, true) != -1) {
+                        p += "ID:${it.name} 所在队伍:${team.name}\n"
                     }
-                    p.toPlainText()
-                } else {
-                    CustomerLang.searchErr.replace("//action//", "服务器玩家").toPlainText()
                 }
             }
+            p.toPlainText()
+        } else {
+            CustomerLang.searchErr.replace("//action//", "服务器玩家").toPlainText()
         }
-        return CustomerLang.nullServerErr.replace("//err//", "第${serverCount}个").toPlainText()
     }
 }

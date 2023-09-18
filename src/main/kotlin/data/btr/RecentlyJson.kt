@@ -1,4 +1,4 @@
-package top.ffshaozi.data
+package top.ffshaozi.data.btr
 
 import java.util.Date
 

@@ -11,10 +11,6 @@ import top.ffshaozi.config.CustomerCmd.provideDelegate
  * @Date 2023/8/25
  */
 object CustomerCmd : ReadOnlyPluginConfig("CustomerCmd") {
-    @ValueDescription("vip管理服务")
-    val vips by value(listOf("*vips"))
-    @ValueDescription("玩家管理服务")
-    val sls by value(listOf("*sls"))
     @ValueDescription("帮助")
     val help by value(listOf("*help", "*帮助", "*?"))
     @ValueDescription("绑定")

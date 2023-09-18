@@ -1,11 +1,9 @@
 package top.ffshaozi.utils
 
 import com.google.gson.Gson
-import data.*
 import kotlinx.coroutines.runBlocking
 import net.mamoe.mirai.console.MiraiConsole
 import net.mamoe.mirai.console.rootDir
-import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -14,6 +12,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
 import top.ffshaozi.NeriQQBot.Glogger
 import top.ffshaozi.data.*
+import top.ffshaozi.data.btr.RecentlyJson
+import top.ffshaozi.data.btr.RecentlyServerJson
+import top.ffshaozi.data.ea.FullServerInfoJson
+import top.ffshaozi.data.ea.WelcomeMessage
+import top.ffshaozi.data.eac.*
+import top.ffshaozi.data.gameTool.*
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -759,6 +763,39 @@ object BF1Api {
             )
         )
         return postApi(body, sessionId)
+    }
+
+    //获取生涯数据
+    fun getStatsByEA(eaid: String,sessionId: String,isLog: Boolean = true): PostResponse {
+        val pid = getApi("https://api.bfeac.com/utils/search/$eaid", isLog)
+        if (!pid.isSuccessful) return pid
+        val personaId = Gson().fromJson(pid.reqBody,PlayerPID::class.java).data.personaId
+        val method = "Stats.detailedStatsByPersonaId"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val personaId = personaId
+                }
+            )
+        )
+        return postApi(body, sessionId,isLog)
+    }
+
+    //获取生涯数据
+    fun getStatsByPID(personaId: String,sessionId: String,isLog: Boolean = true): PostResponse {
+        val method = "Stats.detailedStatsByPersonaId"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val game = "tunguska"
+                    val personaId = personaId
+                }
+            )
+        )
+        return postApi(body, sessionId,isLog)
     }
 
     //获取服务器完整信息

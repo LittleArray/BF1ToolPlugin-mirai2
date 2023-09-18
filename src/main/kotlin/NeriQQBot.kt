@@ -12,13 +12,10 @@ import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.event.subscribeGroupTempMessages
 import net.mamoe.mirai.utils.MiraiLogger
 import net.mamoe.mirai.utils.info
-import top.ffshaozi.NeriQQBot.reload
-import top.ffshaozi.NeriQQBot.save
 import top.ffshaozi.command.BF1Cmd
 import top.ffshaozi.config.*
-import top.ffshaozi.config.Setting.groupData
-import top.ffshaozi.intent.Cache
 import top.ffshaozi.intent.Cache.BotGroups
+import top.ffshaozi.intent.CycleTask
 import top.ffshaozi.intent.Intent
 import top.ffshaozi.intent.ServerApi
 import top.ffshaozi.utils.BF1Api
@@ -52,16 +49,17 @@ object NeriQQBot : KotlinPlugin(
         BF1Cmd.register()
         Glogger.info { "基础命令加载成功" }
         BotLog.reload()
+        Glogger.info { "Log加载成功" }
         Bindings.reload()
-        //绑定数据转换
-        /*Cache.serverInfoIterator { groupId, groupData, serverCount, serverInfoForSave ->
-            groupData.recentlyTempWhitelist.forEach {  id ->
-                Bindings.recentlyTempWhitelist.add(id)
-            }
-        }*/
-        Bindings.save()
-        Setting.logerSetting()
+        Glogger.info { "绑定数据加载成功" }
+        ServerInfos.reload()
+        Glogger.info { "服务器数据加载成功" }
+        GroupSetting.reload()
+        Glogger.info { "群组数据加载成功" }
+        //Setting.logerSetting()
         ServerApi.run(Setting.port)
+        CycleTask.serverManageRefresh()
+        CycleTask.vipRefresh()
         //登录事件
         globalEventChannel().subscribeOnce<BotOnlineEvent> { onlineEvent ->
             Glogger.info("重注册${onlineEvent.bot.id}登录事件响应 ")
@@ -79,13 +77,13 @@ object NeriQQBot : KotlinPlugin(
                 bot.eventChannel.subscribeGroupTempMessages {
                     startsWith("*") reply { s ->
                         var temp: Any? = null
-                        groupData.forEach { (it, data) ->
-                            temp = if (it == this.group.id) {
+                        GroupSetting.groupSetting.forEach {
+                            temp = if (it.groupID == this.group.id) {
                                 var isAdmin = false
                                 this.group.members.forEach { normalMember ->
                                     if (normalMember.permission.level != 0 && normalMember.id == this.sender.id) isAdmin = true
                                 }
-                                data.operator.forEach {
+                                it.operator.forEach {
                                     if (it == this.sender.id) isAdmin = true
                                 }
                                 Intent.runTemp(this, s, isAdmin)
@@ -98,13 +96,13 @@ object NeriQQBot : KotlinPlugin(
                 }
                 Glogger.info("重注册${bot.id}群会话事件响应 ")
                 bot.eventChannel.subscribeGroupMessages {
-                    groupData.forEach { (it, data) ->
-                        sentFrom(it) quoteReply  { s ->
+                    GroupSetting.groupSetting.forEach {
+                        sentFrom(it.groupID ?:0L) quoteReply  { s ->
                             var isAdmin = false
                             this.group.members.forEach {
                                 if (it.permission.level != 0 && it.id == this.sender.id) isAdmin = true
                             }
-                            data.operator.forEach {
+                            it.operator.forEach {
                                 if (it == this.sender.id) isAdmin = true
                             }
                             Intent.run(this, s, isAdmin)
@@ -113,8 +111,8 @@ object NeriQQBot : KotlinPlugin(
                 }
                 Glogger.info("重注册${bot.id}入群判断事件响应 ")
                 bot.eventChannel.subscribeAlways<MemberJoinRequestEvent>{
-                    groupData.forEach { (groupId, _) ->
-                        if (it.group?.id == groupId) {
+                    GroupSetting.groupSetting.forEach {p->
+                        if (it.group?.id == p.groupID) {
                             val id = message.replace("\n","").replace("问题：EAID","").replace("答案：","")
                             Glogger.info("${fromId}请求入群:${groupId},入群消息:${id}")
                             val stats = BF1Api.getStats(id)
@@ -123,7 +121,7 @@ object NeriQQBot : KotlinPlugin(
                                 this.group?.members?.forEach {
                                     if (fromId == it.id) it.nameCard = id
                                 }
-                                group?.id?.let { gr -> Setting.addBinding(gr, fromId, id) }
+                                group?.id?.let { gr -> Bindings.addBinding(gr, fromId, id) }
                                 this.group?.sendMessage("新成员进群,快欢迎他,EAID:${id},尝试改名")
                             }
                         }

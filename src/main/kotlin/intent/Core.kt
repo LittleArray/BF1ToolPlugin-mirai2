@@ -8,6 +8,7 @@ import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.NeriQQBot
 import top.ffshaozi.NeriQQBot.logger
 import top.ffshaozi.config.CustomerCmd
@@ -27,7 +28,7 @@ object Intent {
         )
         var result: Message? = null
         val cmdList = hashMapOf(
-            listOf("*bdssid", "*绑定服务器ssid") to { ServerManagement.bindingServerSessionId(pullIntent) },
+            listOf("*bdssid", "*绑定服务器ssid") to { "重构中".toPlainText() },
         )
         cmdList.forEach { v ->
             v.key.forEach {
@@ -59,8 +60,6 @@ object Intent {
             listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*步枪", "*制式步枪","*手枪","*副武器","*佩枪","*机枪")
         var result: Any? = null
         val cmdList = hashMapOf(
-            CustomerCmd.vips to { runBlocking { CycleTask.vipRefresh() } },
-            CustomerCmd.sls to { runBlocking { CycleTask.serverManageRefresh() } },
             CustomerCmd.help to { runBlocking { help(pullIntent) } },
             CustomerCmd.binding to { runBlocking { EnquiryService.bindingUser(pullIntent) } },
             CustomerCmd.bf1 to { runBlocking { EnquiryService.bf1(pullIntent) } },
@@ -71,7 +70,6 @@ object Intent {
             CustomerCmd.weapon to { runBlocking { EnquiryService.searchWp(pullIntent) } },
             CustomerCmd.recently to { runBlocking { EnquiryService.searchRecently(pullIntent) } },
             CustomerCmd.playerList to { runBlocking { EnquiryService.searchServerList(pullIntent) } },
-            CustomerCmd.bindingServer to { runBlocking { ServerManagement.bindingServer(pullIntent) } },
             CustomerCmd.setkd to { runBlocking { ServerManagement.setKDInfo(pullIntent) } },
             CustomerCmd.ky to { runBlocking { ServerManagement.wl(pullIntent) } },
             CustomerCmd.kick to { runBlocking { ServerManagement.kickPlayer(pullIntent) } },

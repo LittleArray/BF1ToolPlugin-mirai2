@@ -1,4 +1,4 @@
-package data
+package top.ffshaozi.data.eac
 
 data class EacInfoJson(
     val data: List<Data>?=null,

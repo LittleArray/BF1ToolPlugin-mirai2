@@ -19,6 +19,8 @@ object BotLog: AutoSavePluginData("BotLog-${SimpleDateFormat("yyyy-MM-dd HH-mm-s
     var exitServerLog: MutableMap<String,String> by value()
     @ValueDescription("重进log")
     var reEnterServerLog: MutableMap<String,String> by value()
+    @ValueDescription("观战log")
+    var spectatorServerLog: MutableMap<String,String> by value()
     @ValueDescription("换边log")
     var teamChangeLog: MutableList<String> by value()
     @ValueDescription("踢人log")
@@ -28,6 +30,12 @@ object BotLog: AutoSavePluginData("BotLog-${SimpleDateFormat("yyyy-MM-dd HH-mm-s
     fun enterServerLog(joinTime:Date,playerID:String,gameID:String){
         if (joinTime.time != 0L){
             enterServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(joinTime)] = "$playerID $gameID"
+            save()
+        }
+    }
+    fun spectatorServerLog(joinTime:Date,playerID:String,gameID:String){
+        if (joinTime.time != 0L){
+            spectatorServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(joinTime)] = "$playerID $gameID"
             save()
         }
     }

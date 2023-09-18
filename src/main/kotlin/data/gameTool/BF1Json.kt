@@ -1,4 +1,4 @@
-package top.ffshaozi.data
+package top.ffshaozi.data.gameTool
 
 /**
  * @Description
@@ -7,7 +7,7 @@ package top.ffshaozi.data
  */
 data class BF1Json(
     var isSuccessful:Boolean = false,
-    val regions: MutableMap<String,Regions>?=null
+    val regions: MutableMap<String, Regions>?=null
 )
 
 data class Regions(

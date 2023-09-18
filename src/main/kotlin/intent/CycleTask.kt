@@ -1,22 +1,9 @@
 package top.ffshaozi.intent
 
-import data.MultiCheckPostJson
-import data.MultiCheckResponse
-import kotlinx.coroutines.*
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.NeriQQBot
-import top.ffshaozi.config.DataForGroup
-import top.ffshaozi.config.Setting
-import top.ffshaozi.config.Setting.groupData
-import top.ffshaozi.intent.Intent.sendMsg
 import top.ffshaozi.utils.BF1Api
-import top.ffshaozi.utils.BF1Api.getPersonaid
-import top.ffshaozi.utils.BF1Api.getStats
-import top.ffshaozi.utils.BF1Api.kickPlayer
-import top.ffshaozi.utils.BF1Api.recentlySearch
-import top.ffshaozi.utils.BF1Api.searchBFEAC
-import top.ffshaozi.utils.BF1Api.searchBFEACByPid
 
 
 object CycleTask {
@@ -43,7 +30,7 @@ object CycleTask {
         Cache.VipCThreadPool = Thread {
             while (Cache.VipAlive) {
                 //移除VIP
-                groupData.forEach { groupID, Data ->
+                /*groupData.forEach { groupID, Data ->
                     Data.server.forEach {
                         var removeID = ""
                         it.vipList.forEach { (id, endTime) ->
@@ -64,7 +51,7 @@ object CycleTask {
                             }
                         }
                     }
-                }
+                }*/
                 NeriQQBot.Glogger.info("VIP管理服务")
                 Thread.sleep(10000)
             }
