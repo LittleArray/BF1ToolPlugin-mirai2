@@ -191,38 +191,7 @@ object ServerInfos : AutoSavePluginData("ServerInfo") {
         }
         return null
     }
-    /**
-     * 判断是不是因为kd被踢
-     * @param gameID String
-     * @param recentlyMaxKD Float
-     * @param recentlyMaxKPM Float
-     * @param lifeMaxKD Float
-     * @param lifeMaxKPM Float
-     * @return Boolean
-     */
-    fun getIsKick(
-        gameID: String,
-        recentlyMaxKD: Float = 0F,
-        recentlyMaxKPM: Float = 0F,
-        lifeMaxKD: Float = 0F,
-        lifeMaxKPM: Float = 0F,
-    ):Boolean {
-        serverInfo.forEach {
-            if (it.gameID == gameID) {
-                if (!it.isEnableAutoKick)
-                    return false
-                if (lifeMaxKD > it.lifeMaxKD)
-                     return true
-                if (lifeMaxKPM > it.lifeMaxKPM)
-                    return true
-                if (recentlyMaxKPM > it.recentlyMaxKPM  )
-                    return true
-                if (recentlyMaxKD > it.recentlyMaxKD)
-                    return true
-            }
-        }
-        return false
-    }
+
 }
 
 @Serializable
@@ -236,6 +205,8 @@ data class _ServerInfo(
     var botGroup: Long = 605712770L,
     var botUrl: String = "https://asoul.zj.cn/api/warm/status",
     var isEnableAutoKick: Boolean = true,
+    var isEnableReEnterKick: Boolean = true,
+    var ReEnterKickMsg: String = "伺服器禁止短時間內重進",
     var recentlyMaxKD: Float = 2.0F,
     var recentlyMaxKPM: Float = 1.5F,
     var lifeMaxKD: Float = 1.5F,

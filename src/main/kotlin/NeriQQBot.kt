@@ -3,8 +3,10 @@ package top.ffshaozi
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.console.command.CommandManager.INSTANCE.register
 import net.mamoe.mirai.console.command.CommandManager.INSTANCE.unregister
+import net.mamoe.mirai.console.command.descriptor.DoubleValueArgumentParser.findGroupOrFail
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
+import net.mamoe.mirai.containsGroup
 import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.MemberJoinRequestEvent
 import net.mamoe.mirai.event.globalEventChannel
@@ -68,7 +70,6 @@ object NeriQQBot : KotlinPlugin(
                 Glogger.info {
                     "检测到Bot:${bot.id}上线"
                 }
-
                 bot.bot.groups.forEach { group ->
                     BotGroups = BotGroups + group.name + "   " + group.id + ","
                 }
