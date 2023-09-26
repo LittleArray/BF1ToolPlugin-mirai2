@@ -25,38 +25,42 @@ object BotLog: AutoSavePluginData("BotLog-${SimpleDateFormat("yyyy-MM-dd HH-mm-s
     var teamChangeLog: MutableList<String> by value()
     @ValueDescription("踢人log")
     var kickLog: MutableList<String> by value()
-    @ValueDescription("驻留玩家log")
-    var stateServerLog: MutableList<String> by value()
+    @ValueDescription("封禁log")
+    var banLog: MutableList<String> by value()
     fun enterServerLog(joinTime:Date,playerID:String,gameID:String){
         if (joinTime.time != 0L){
-            enterServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(joinTime)] = "$playerID $gameID"
+            enterServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(joinTime)] = "$playerID $gameID"
             save()
         }
     }
     fun spectatorServerLog(joinTime:Date,playerID:String,gameID:String){
         if (joinTime.time != 0L){
-            spectatorServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(joinTime)] = "$playerID $gameID"
+            spectatorServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(joinTime)] = "$playerID $gameID"
             save()
         }
     }
     fun exitServerLog(exitTime:Date,playerID:String,gameID:String){
         if (exitTime.time != 0L) {
-            exitServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(exitTime)] = "$playerID $gameID"
+            exitServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(exitTime)] = "$playerID $gameID"
             save()
         }
     }
     fun reEnterServerLog(joinTime: Date,playerID:String,gameID:String){
         if (joinTime.time != 0L) {
-            reEnterServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(joinTime)] = "$playerID $gameID"
+            reEnterServerLog[SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(joinTime)] = "$playerID $gameID"
             save()
         }
     }
     fun teamChangeLog(playerID:String,gameID:String,newTeam:String){
-        teamChangeLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis())}] 玩家${playerID}在服务器${gameID}执行换边操作 -> ${newTeam}")
+        teamChangeLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(System.currentTimeMillis())}] 玩家${playerID}在服务器${gameID}执行换边操作 -> ${newTeam}")
         save()
     }
     fun kickLog(playerID:String,gameID:String,reason:String){
-        kickLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis())}] 玩家${playerID}在服务器${gameID}被踢出 理由:${reason}")
+        kickLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(System.currentTimeMillis())}] 玩家${playerID}在服务器${gameID}被踢出 理由:${reason}")
+        save()
+    }
+    fun banLog(playerID:String,gameID:String,reason:String){
+        banLog.add("[${SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(System.currentTimeMillis())}] 玩家${playerID}在服务器${gameID}被Ban 理由:${reason}")
         save()
     }
 }

@@ -9,6 +9,7 @@ import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.containsGroup
 import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.events.MemberJoinRequestEvent
+import net.mamoe.mirai.event.events.MemberLeaveEvent
 import net.mamoe.mirai.event.globalEventChannel
 import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.event.subscribeGroupTempMessages
@@ -51,13 +52,16 @@ object NeriQQBot : KotlinPlugin(
         BF1Cmd.register()
         Glogger.info { "基础命令加载成功" }
         BotLog.reload()
+        HistoryLog.reload()
         Glogger.info { "Log加载成功" }
         Bindings.reload()
+        BackgroundImgData.reload()
         Glogger.info { "绑定数据加载成功" }
         ServerInfos.reload()
         Glogger.info { "服务器数据加载成功" }
         GroupSetting.reload()
         Glogger.info { "群组数据加载成功" }
+
         //Setting.logerSetting()
         ServerApi.run(Setting.port)
         CycleTask.serverManageRefresh()
@@ -116,15 +120,16 @@ object NeriQQBot : KotlinPlugin(
                         if (it.group?.id == p.groupID) {
                             val id = message.replace("\n","").replace("问题：EAID","").replace("答案：","")
                             Glogger.info("${fromId}请求入群:${groupId},入群消息:${id}")
-                            val stats = BF1Api.getStats(id)
-                            if (stats.isSuccessful){
-                                accept()
-                                this.group?.members?.forEach {
-                                    if (fromId == it.id) it.nameCard = id
-                                }
-                                group?.id?.let { gr -> Bindings.addBinding(gr, fromId, id) }
-                                this.group?.sendMessage("新成员进群,快欢迎他,EAID:${id},尝试改名")
-                            }
+                            this.group?.sendMessage("${fromNick}[${fromId}]尝试进群,EAID:${id},管理员请核对")
+                        }
+                    }
+                }
+                Glogger.info("重注册${bot.id}离开群判断事件响应 ")
+                bot.eventChannel.subscribeAlways<MemberLeaveEvent> {
+                    GroupSetting.groupSetting.forEach { p ->
+                        if (it.group.id == p.groupID) {
+                            this.group.sendMessage("${member.nick}[${member.id}]受不了群里的南通氛围,离开了")
+                            Bindings.bindingData.remove(member.id)
                         }
                     }
                 }

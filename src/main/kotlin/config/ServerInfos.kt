@@ -192,6 +192,40 @@ object ServerInfos : AutoSavePluginData("ServerInfo") {
         return null
     }
 
+    /**
+     * 添加服务器Vip
+     * @param gameID String
+     * @param ID String
+     * @param time Float
+     * @return Boolean
+     */
+    fun addVip(gameID: String,ID:String,time:Float):Boolean{
+        serverInfo.forEach {
+            if (gameID == it.gameID){
+                val old = it.vipList[ID] ?: System.currentTimeMillis().toFloat()
+                val endTime = old + (time * 24 * 60 * 60 * 1000)
+                it.vipList[ID] = endTime
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * 移除服务器VIP
+     * @param gameID String
+     * @param ID String
+     * @return Boolean
+     */
+    fun removeVip(gameID: String,ID: String):Boolean{
+        serverInfo.forEach {
+            if (gameID == it.gameID) {
+               it.vipList.remove(ID)
+                return true
+            }
+        }
+        return false
+    }
 }
 
 @Serializable
@@ -206,6 +240,7 @@ data class _ServerInfo(
     var botUrl: String = "https://asoul.zj.cn/api/warm/status",
     var isEnableAutoKick: Boolean = true,
     var isEnableReEnterKick: Boolean = true,
+    var isEnableSpKick: Boolean = true,
     var ReEnterKickMsg: String = "伺服器禁止短時間內重進",
     var recentlyMaxKD: Float = 2.0F,
     var recentlyMaxKPM: Float = 1.5F,

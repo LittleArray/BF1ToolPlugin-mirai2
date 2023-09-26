@@ -6,6 +6,7 @@ import net.mamoe.mirai.console.command.descriptor.ExperimentalCommandDescriptors
 import top.ffshaozi.NeriQQBot
 import top.ffshaozi.config.GroupSetting
 import top.ffshaozi.config.ServerInfos
+import top.ffshaozi.intent.Cache
 import top.ffshaozi.intent.Cache.BotGroups
 import top.ffshaozi.intent.CycleTask
 
@@ -157,6 +158,17 @@ object BF1Cmd : CompositeCommand(
             sendMessage("设置成功")
         } else {
             sendMessage("设置失败")
+        }
+    }
+
+    @SubCommand()
+    @Description("要塞循环服务")
+    suspend fun CommandSender.ysxh(gameID: String) {
+        if (Cache.ServerInfoList[gameID] !=null) {
+            Cache.ServerInfoList[gameID]!!.isYaoSaiXunHuan = Cache.ServerInfoList[gameID]!!.isYaoSaiXunHuan != true
+            sendMessage("修改服务器$gameID 的要塞循环状态为${Cache.ServerInfoList[gameID]!!.isYaoSaiXunHuan}")
+        }else{
+            sendMessage("不存在该服务器或者服务器没刷新")
         }
     }
 

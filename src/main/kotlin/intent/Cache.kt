@@ -6,14 +6,10 @@ import data.BotsJson
 import top.ffshaozi.data.eac.MultiCheckPostJson
 import top.ffshaozi.data.eac.MultiCheckResponse
 import kotlinx.coroutines.*
-import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.NeriQQBot.GlobalBots
 import top.ffshaozi.NeriQQBot.Glogger
-import top.ffshaozi.config.Bindings
-import top.ffshaozi.config.BotLog
-import top.ffshaozi.config.GroupSetting
-import top.ffshaozi.config.ServerInfos
+import top.ffshaozi.config.*
 import top.ffshaozi.data.ea.Stats
 import top.ffshaozi.utils.BF1Api
 import top.ffshaozi.utils.BF1Api.getPlayerListBy22
@@ -46,7 +42,7 @@ object Cache {
     //机器人所有群
     var BotGroups: String = ""
 
-    //上一天消息缓存
+    //上一条消息缓存
     var lastMsg: String = ""
     var mapCache: HashMap<String, String> = hashMapOf(
         "MP_Desert" to "西奈沙漠",
@@ -91,6 +87,7 @@ object Cache {
         var oldPlayers: Int = 0,
         var loadingPlayers: Int = 0,
         var spectatorPlayers: Int = 0,
+        var isYaoSaiXunHuan: Boolean = false,
         val cacheTime: Date,
         val zeroTime: Int = 0,
     )
@@ -123,6 +120,7 @@ object Cache {
         var pid: Long = 0L,
         var platoon: String = "",
         var latency: Int,
+        var langLong: Long,
         var isBot: Boolean = false,
         var botState: String = "",
         var gameID: String = "",
@@ -142,12 +140,11 @@ object Cache {
                 field = value
                 if (old != value) {
                     if (player.initRole == "") {
-                        val players = ServerInfoList[gameID]!!.spectatorPlayers + 1
-                        ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(spectatorPlayers = players)
                         BotLog.spectatorServerLog(Date(join_time / 1000), player.id, player.gameID)
                     }
                     if (!isBot) {
                         BotLog.enterServerLog(Date(join_time / 1000), id, gameID)
+                        HistoryLog.addHistoryLog(id, Date(join_time / 1000), gameID)
                         ifReEnter()
                     }
                 }
@@ -196,17 +193,22 @@ object Cache {
                 field = value
                 platoonLimited()
             }
+        var platoonTagList: MutableList<String> = mutableListOf()
+
         private val coroutineScope = CoroutineScope(Dispatchers.IO)
+        private val player = this
         private var isDead = false
         private var isKicking = false
         private var isAddPlayers = false
-        private val player = this
+        private var isStandby  = false
+        private var isMapChange  = false
         private var messageCD = 0
         private var ssid = ""
         private var RSPid = ""
         private var isEnableAutoKick = false
         private var isEnableReEnterKick = false
-        private var ReEnterKickMsg = ""
+        private var isEnableSpKick = false
+        private var reEnterKickMsg = ""
 
         init {
             //更新Player的数据
@@ -251,17 +253,39 @@ object Cache {
         }
 
         /**
+         * 更新地图
+         */
+        fun mapChange(){
+            isMapChange = true
+        }
+        /**
          * 角色变更
          */
         private fun roleChange() {
             if (ServerInfoList[gameID] != null) {
                 if (player.role == "") {
-                    val players = ServerInfoList[gameID]!!.spectatorPlayers + 1
-                    ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(spectatorPlayers = players)
+                    val sp = ServerInfoList[player.gameID]?.opPlayers?.split(";")
+                    var isOp = false
+                    sp?.forEach {
+                        if (player.pid == it.toLong()) isOp = true
+                    }
+                    if (!isOp && !isKicking) {
+                        isKicking = true
+                        coroutineScope.launch {
+                            val kick = player.kick("禁止觀戰 NoWatching")
+                            if (!kick.isSuccessful) {
+                                messageCD++
+                                if (messageCD % 2 == 0) {
+                                    sendMessage(
+                                        player.gameID,
+                                        "${player.id}在//SC//服偷偷观战没被踹出去"
+                                    )
+                                }
+                            }
+                            isKicking = false
+                        }
+                    }
                     BotLog.spectatorServerLog(Date(join_time), player.id, player.gameID)
-                } else {
-                    val players = ServerInfoList[gameID]!!.spectatorPlayers - 1
-                    ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(spectatorPlayers = players)
                 }
             }
         }
@@ -270,36 +294,18 @@ object Cache {
          * 更新服务器的数据
          */
         private fun playerSizeUpdate() {
-            if (ServerInfoList[gameID] != null) {
-                if (player.role != "") {
-                    if (teamId != 65535) {
-                        if (isBot) {
-                            val bots = ServerInfoList[gameID]!!.bots + 1
-                            ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(bots = bots)
-                        } else {
-                            val players = ServerInfoList[gameID]!!.players + 1
-                            ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(players = players)
-                        }
-                        val loadingPlayers =
-                            if (ServerInfoList[gameID]!!.loadingPlayers - 1 < 0) 0 else ServerInfoList[gameID]!!.loadingPlayers - 1
-                        ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(loadingPlayers = loadingPlayers)
-                        isAddPlayers = true
-                    } else {
-                        val loadingPlayers = ServerInfoList[gameID]!!.loadingPlayers + 1
-                        ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(loadingPlayers = loadingPlayers)
-                    }
-                }
-            }
+
         }
 
         /**
          * 账号数据检测
          */
         fun statsUpdate() {
-            if (player.lkd > 0 && player.lkp > 0) return
+            if (player.lkd > 0 && player.lkp > 0 && !isStandby || isBot) return
             coroutineScope.launch {
                 val stats = BF1Api.getAllStats(player.id, false)
                 if (stats.isSuccessful) {
+                    isStandby = false
                     if (stats.killDeath != null && stats.killDeath > 0) player.lkd = stats.killDeath.toFloat()
                     if (stats.killsPerMinute != null && stats.killsPerMinute > 0) player.lkp =
                         stats.killsPerMinute.toFloat()
@@ -309,14 +315,17 @@ object Cache {
                     val response = BF1Api.getStatsByPID(player.pid.toString(), player.ssid, false)
                     if (response.isSuccessful) {
                         val statsP = Gson().fromJson(response.reqBody, Stats::class.java)
-                        if (statsP.result.basicStats.kpm > 0) player.lkp = statsP.result.basicStats.kpm.toFloat()
+                        if (statsP.result.basicStats.kpm > 0){
+                            player.lkp = statsP.result.basicStats.kpm.toFloat()
+                        }
                         if (statsP.result.basicStats.kills > 0 &&
                             statsP.result.basicStats.deaths > 0
                         ) {
-                            player.lkd =
-                                DecimalFormat("#.00").format(statsP.result.basicStats.kills.toFloat() / statsP.result.basicStats.deaths.toFloat())
-                                    .toFloat()
+                            player.lkd = DecimalFormat("#.00")
+                                .format(statsP.result.basicStats.kills.toFloat() / statsP.result.basicStats.deaths.toFloat())
+                                .toFloat()
                         }
+                        isStandby = true
                     }
                 }
                 if (player.rank > 120) {
@@ -334,11 +343,13 @@ object Cache {
                 if (stats.platoons != null) {
                     stats.platoons.forEach {
                         _platoonList.add(it.name)
+                        platoonTagList.add(it.tag)
                     }
                 }
                 if (stats.activePlatoon?.tag != null) {
                     player.platoon = stats.activePlatoon.tag
                     _platoonList.add(stats.activePlatoon.tag)
+                    platoonTagList.add(stats.activePlatoon.tag)
                 }
                 player.platoonList = _platoonList
             }
@@ -348,6 +359,7 @@ object Cache {
          * 最近检测
          */
         fun recentlyUpdate() {
+            if (player.rkd > 0 && player.rkp > 0 || isBot) return
             coroutineScope.launch {
                 val recentlyJson = BF1Api.recentlySearch(player.id, false)
                 run p@{
@@ -371,13 +383,14 @@ object Cache {
                     ssid = it.sessionId.toString()
                     RSPid = it.serverRspID.toString()
                     isEnableAutoKick = it.isEnableAutoKick
+                    isEnableSpKick = it.isEnableSpKick
                     lifeMaxKD = it.lifeMaxKD
                     lifeMaxKPM = it.lifeMaxKPM
                     recentlyMaxKPM = it.recentlyMaxKPM
                     recentlyMaxKD = it.recentlyMaxKD
                     isEnableReEnterKick = it.isEnableReEnterKick
                     if (isEnableReEnterKick) {
-                        ReEnterKickMsg = it.ReEnterKickMsg
+                        reEnterKickMsg = it.ReEnterKickMsg
                     }
                 }
             }
@@ -389,6 +402,8 @@ object Cache {
         private fun platoonLimited() {
             //该服务器没有启用自动踢人
             if (!isEnableAutoKick) return
+            val isW = Bindings.recentlyTempWhitelist.any { player.id == it }
+            if (isW) return
             player.platoonList.forEach { pp ->
                 if (isKicking) return
                 var isLimited = false
@@ -399,7 +414,7 @@ object Cache {
                         }
                     }
                 }
-                if (isLimited) {
+                if (isLimited && !isKicking) {
                     isKicking = true
                     coroutineScope.launch {
                         val kick = player.kick("Platoon Limited")
@@ -429,10 +444,7 @@ object Cache {
             if (isKicking) return
             //该服务器没有启用自动踢人
             if (!isEnableAutoKick) return
-            var isW = false
-            Bindings.recentlyTempWhitelist.forEach {
-                if (player.id == it) isW = true
-            }
+            val isW = Bindings.recentlyTempWhitelist.any { player.id == it }
             if (isW) return
             if (
                 player.lkd > player.lifeMaxKD ||
@@ -440,19 +452,21 @@ object Cache {
                 player.rkd > player.recentlyMaxKD ||
                 player.rkp > player.recentlyMaxKPM
             ) {
-                isKicking = true
-                coroutineScope.launch {
-                    val kick = player.kick("KD Limited")
-                    if (!kick.isSuccessful) {
-                        messageCD++
-                        if (messageCD % 2 == 0) {
-                            sendMessage(
-                                player.gameID,
-                                "臭捞逼${player.id}在//SC//服没被踹出去\n生涯KD:${player.lkd} KPM:${player.lkp} 最近KD:${player.rkd} KPM:${player.rkp}"
-                            )
+                if (!isKicking) {
+                    isKicking = true
+                    coroutineScope.launch {
+                        val kick = player.kick("KD Limited")
+                        if (!kick.isSuccessful) {
+                            messageCD++
+                            if (messageCD % 2 == 0) {
+                                sendMessage(
+                                    player.gameID,
+                                    "臭捞逼${player.id}在//SC//服没被踹出去\n生涯KD:${player.lkd} KPM:${player.lkp} 最近KD:${player.rkd} KPM:${player.rkp}"
+                                )
+                            }
                         }
+                        isKicking = false
                     }
-                    isKicking = false
                 }
             }
         }
@@ -461,10 +475,15 @@ object Cache {
          * 更换队伍事件
          */
         private fun teamChange() {
-            Glogger.info("玩家${id}在${gameID}服换边 -> $teamId")
-            //log
-            if (!isBot)
-                BotLog.teamChangeLog(id, gameID, teamId.toString())
+            if (!isMapChange){
+                Glogger.info("玩家${id}在${gameID}服换边 -> $teamId")
+                //log
+                if (!isBot)
+                    BotLog.teamChangeLog(id, gameID, teamId.toString())
+
+            }else{
+                isMapChange = false
+            }
         }
 
         /**
@@ -473,7 +492,7 @@ object Cache {
         private fun ifReEnter() {
             if (!isBot) {
                 BotLog.exitServerLog.forEach { (time, data) ->
-                    val exitTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(time)
+                    val exitTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").parse(time)
                     val cd = 10 * 60 * 1000
                     if (join_time / 1000 - exitTime.time < cd) {
                         val sp = data.split(" ")
@@ -486,19 +505,21 @@ object Cache {
                                 }
                             }
                             if (isEnableReEnterKick) {
-                                isKicking = true
-                                coroutineScope.launch {
-                                    val kick = player.kick(ReEnterKickMsg)
-                                    if (!kick.isSuccessful) {
-                                        messageCD++
-                                        if (messageCD % 2 == 0) {
-                                            sendMessage(
-                                                player.gameID,
-                                                "玩家${player.id}在//SC//服短时间内重进没被踹出去"
-                                            )
+                                if (!isKicking) {
+                                    isKicking = true
+                                    coroutineScope.launch {
+                                        val kick = player.kick(reEnterKickMsg)
+                                        if (!kick.isSuccessful) {
+                                            messageCD++
+                                            if (messageCD % 2 == 0) {
+                                                sendMessage(
+                                                    player.gameID,
+                                                    "玩家${player.id}在//SC//服短时间内重进没被踹出去"
+                                                )
+                                            }
                                         }
+                                        isKicking = false
                                     }
-                                    isKicking = false
                                 }
                             }
                         }
@@ -514,21 +535,13 @@ object Cache {
             isDead = true
             coroutineScope.cancel()
             if (ServerInfoList[gameID] != null) {
-                if (player.role != "") {
-                    if (isBot) {
-                        val bots = ServerInfoList[gameID]!!.bots - 1
-                        ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(bots = bots)
-                    } else {
-                        val players = ServerInfoList[gameID]!!.players - 1
-                        ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(players = players)
-                        if (player.rank > 120) {
-                            val oldPlayers = ServerInfoList[gameID]!!.oldPlayers - 1
-                            ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(oldPlayers = oldPlayers)
-                        }
-                    }
-                } else {
+                if (player.role == "") {
                     val players = ServerInfoList[gameID]!!.spectatorPlayers - 1
                     ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(spectatorPlayers = players)
+                }
+                if (player.rank > 120) {
+                    val oldPlayers = ServerInfoList[gameID]!!.oldPlayers - 1
+                    ServerInfoList[gameID] = ServerInfoList[gameID]!!.copy(oldPlayers = oldPlayers)
                 }
             }
             //Log
@@ -554,7 +567,27 @@ object Cache {
                 //判断缓存
                 if (gameIDCache.any { it == oldGameID }) return@p
                 //val list = BF1Api.searchServerList(oldGameID)
-                val list = getPlayerListBy22(oldGameID)
+                var list = getPlayerListBy22(oldGameID)
+                //防止数据有误
+                var size = 0
+                list.GDAT?.get(0)?.ROST?.forEach { p ->
+                    size++
+                }
+                if (size == 0) {
+                    runBlocking c@{
+                        //重试3次
+                        repeat(2) {
+                            //Glogger.warning("$oldGameID 玩家列表为空,正在纠正")
+                            list = getPlayerListBy22(oldGameID)
+                            var _size = 0
+                            list.GDAT?.get(0)?.ROST?.forEach { p ->
+                                _size++
+                            }
+                            if (_size > 0) return@c
+                            delay(3000)
+                        }
+                    }
+                }
                 if (!list.isSuccessful) return@p
                 //添加缓存
                 gameIDCache.add(oldGameID)
@@ -570,7 +603,19 @@ object Cache {
                         } catch (e: JsonSyntaxException) {
                             Glogger.error(e.stackTraceToString())
                         }
-                        //NeriQQBot.Glogger.warning("唧唧总数:${botsJson?.data?.totalCount}")
+                        //记录可用唧唧数量
+                        val remain = (botsJson?.data?.totalCount ?: 0) -
+                                (botsJson?.data?.abnormalCount ?: 0) -
+                                (botsJson?.data?.notStartedCount ?: 0) -
+                                (botsJson?.data?.usedCount ?: 0) -
+                                (botsJson?.data?.offlineCount ?: 0) -
+                                (botsJson?.data?.startingCount ?: 0)
+
+                        if (remain > 50) {
+                            sendMessage(oldGameID, "唧唧可用数大于50")
+                            Glogger.warning("唧唧可用数:$remain")
+                        }
+
                     }
                 }
                 val admin = (list.GDAT?.get(0)?.ATTR?.admins1 ?: "") +
@@ -583,10 +628,20 @@ object Cache {
                 val leavePlayers = mutableSetOf<String>()
                 //玩家数量
                 var players = 0
+                var loadingPlayers = 0
+                var spectatorPlayers = 0
+                var bots = 0
                 list.GDAT?.get(0)?.ROST?.forEach { p ->
+                    //真实玩家
                     if (botsJson?.data?.bots?.any { it.user == p.NAME } != null && !botsJson.data.bots.any { it.user == p.NAME } && p.ROLE != "" && p.TIDX.toInt() != 65535) {
                         players++
                     }
+                    //加载中玩家
+                    if (p.TIDX.toInt() != 0 && p.TIDX.toInt() != 1) loadingPlayers++
+                    //观战玩家
+                    if (p.ROLE == "") spectatorPlayers++
+                    //机器人
+                    if (botsJson?.data?.bots?.any { it.user == p.NAME } == true) bots++
                     //新玩家
                     if (PlayerListInfo.none { it.id == p.NAME })
                         newPlayers.add(p.NAME)
@@ -594,6 +649,65 @@ object Cache {
                     if (PlayerListInfo.any { it.id == p.NAME })
                         oldPlayers.add(p.NAME)
                 }
+                /*if (ServerInfoList[oldGameID] != null) {
+                    //防止数据有误
+                    if (players == 0) {
+                        ServerInfoList[oldGameID] =
+                            ServerInfoList[oldGameID]!!.copy(zeroTime = ServerInfoList[oldGameID]!!.zeroTime + 1)
+                        //1次都是空的话就一定是空的
+                        if (ServerInfoList[oldGameID]!!.zeroTime < 1) {
+                            Glogger.warning("请求玩家列表可能为空,终止此次执行")
+                            return@p
+                        } else {
+                            ServerInfoList[oldGameID] =
+                                ServerInfoList[oldGameID]!!
+                                    .copy(zeroTime = 0)
+                        }
+
+                    }
+                }*/
+                //掉人提醒
+                if ((ServerInfoList[oldGameID]?.players ?: 0) > players) {
+                    if (players in 30..47) {//剩余玩家30到47
+                        sendMessage(
+                            oldGameID,
+                            "快救//SC//服,要寄了 剩余:$players 人"
+                        )
+                    }
+                    if (players == 0) {
+                        if ((ServerInfoList[oldGameID]?.players ?: 0) != 1)
+                            sendMessage(
+                                oldGameID,
+                                "//SC//服,死完了"
+                            )
+
+                    }
+                }
+                //进人提醒
+                if ((ServerInfoList[oldGameID]?.players ?: 0) < players) {
+                    if (players > 60 && (ServerInfoList[oldGameID]?.players ?: 0) < 60) {
+                        sendMessage(
+                            oldGameID,
+                            "//SC//服暖好了 活人:$players"
+                        )
+                    }
+                }
+                //离开的玩家
+                PlayerListInfo.forEach { old ->
+                    var isLeave = true
+                    list.GDAT?.get(0)?.ROST?.forEach { p ->
+                        if (old.id == p.NAME) isLeave = false
+                    }
+                    if (isLeave && oldGameID == old.gameID) leavePlayers.add(old.id)
+                }
+                //屁都没了
+                if (list.GDAT?.get(0)?.ROST?.size == 0) {
+                    PlayerListInfo.forEach { old ->
+                        leavePlayers.add(old.id)
+                    }
+                }
+                //存储上一把的map
+                val oldMap = ServerInfoList[oldGameID]?.map ?:""
                 //加入服务器数据
                 ServerInfoList[oldGameID] = ServerInfoList[oldGameID]
                     ?.copy(
@@ -602,38 +716,44 @@ object Cache {
                         perfix = list.GDAT?.get(0)?.GNAM ?: "",
                         zeroTime = ServerInfoList[oldGameID]?.zeroTime ?: 0,
                         cacheTime = Date(System.currentTimeMillis()),
-                        opPlayers = admin
+                        opPlayers = admin,
+                        players = players,
+                        loadingPlayers = loadingPlayers,
+                        spectatorPlayers = spectatorPlayers,
+                        bots = bots
                     ) ?: ServerInfo(
                     map = list.GDAT?.get(0)?.ATTR?.level ?: "",
                     mode = list.GDAT?.get(0)?.ATTR?.mode ?: "",
                     perfix = list.GDAT?.get(0)?.GNAM ?: "",
                     zeroTime = ServerInfoList[oldGameID]?.zeroTime ?: 0,
                     cacheTime = Date(System.currentTimeMillis()),
-                    opPlayers = admin
+                    opPlayers = admin,
+                    players = players,
+                    loadingPlayers = loadingPlayers,
+                    spectatorPlayers = spectatorPlayers,
+                    bots = bots
                 )
-
-                //防止数据有误
-                /*if (players == 0) {
-                    ServerInfoList[oldGameID] =
-                        ServerInfoList[oldGameID]!!
-                            .copy(zeroTime = ServerInfoList[oldGameID]!!.zeroTime + 1)
-                    //3次都是空的话就一定是空的
-                    if (ServerInfoList[oldGameID]!!.zeroTime < 3) {
-                        Glogger.warning("请求玩家列表可能为空,终止此次执行")
-                        return@p
-                    } else {
-                        ServerInfoList[oldGameID] =
-                            ServerInfoList[oldGameID]!!
-                                .copy(zeroTime = 0)
+                //要塞循环实现
+                if (ServerInfoList[oldGameID] != null) {
+                    if (ServerInfoList[oldGameID]!!.isYaoSaiXunHuan) {
+                        if (ServerInfoList[oldGameID]!!.map != "MP_Underworld") {
+                            ServerInfos.serverInfo.forEach {
+                                if (it.gameID == oldGameID) {
+                                    val serverInfoJson = BF1Api.getFullServerDetails(it.sessionId ?: "", oldGameID)
+                                    serverInfoJson.result?.serverInfo?.rotation?.forEachIndexed { index, ctx ->
+                                        if (ctx.mapPrettyName == "法烏克斯要塞") {
+                                            BF1Api.chooseServerVIP(
+                                                it.sessionId ?: "",
+                                                serverInfoJson.result.rspInfo.server.persistedGameId,
+                                                index.toString()
+                                            )
+                                            Glogger.warning("已启用要塞循环,强制切图")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }*/
-                //离开的玩家
-                PlayerListInfo.forEach { old ->
-                    var isLeave = true
-                    list.GDAT?.get(0)?.ROST?.forEach { p ->
-                        if (old.id == p.NAME) isLeave = false
-                    }
-                    if (isLeave && oldGameID == old.gameID) leavePlayers.add(old.id)
                 }
                 //离开的玩家整理
                 leavePlayers.forEach { lp ->
@@ -645,17 +765,6 @@ object Cache {
                         } else {
                             false
                         }
-                    }
-                }
-                //掉人提醒
-                if (ServerInfoList[oldGameID]!!.players > players) {
-                    if (ServerInfoList[oldGameID]!!.players - players > 5) {//掉人人数大于5
-                        sendMessage(oldGameID, "//SC//服掉人啦 ${ServerInfoList[oldGameID]!!.players} -> $players")
-                    } else if (players in 30..40) {//剩余玩家30到40
-                        sendMessage(
-                            oldGameID,
-                            "快救//SC//服,要寄了 ${ServerInfoList[oldGameID]!!.players} -> $players"
-                        )
                     }
                 }
                 /*//进人提醒
@@ -685,7 +794,8 @@ object Cache {
                             isBot = botsJson?.data?.bots?.any { it.user == p.NAME } ?: false,
                             gameID = oldGameID,
                             initTeamID = p.TIDX.toInt(),
-                            initRole = p.ROLE
+                            initRole = p.ROLE,
+                            langLong = p.LOC
                         )
                         if (p.JGTS != 0L && p.JGTS != -1L) {
                             temp.join_time = p.JGTS
@@ -707,8 +817,14 @@ object Cache {
                                 if (p.JGTS != 0L && p.JGTS != -1L) {
                                     it.join_time = p.JGTS
                                 }
-                                it.teamId = p.TIDX.toInt()
+                                if (oldMap == ServerInfoList[oldGameID]?.map){
+                                    it.teamId = p.TIDX.toInt()
+                                }else{
+                                    it.mapChange()
+                                    it.teamId = p.TIDX.toInt()
+                                }
                                 it.role = p.ROLE
+                                it.langLong = p.LOC
                                 it.limitedUpdate()
                                 it.recentlyUpdate()
                                 it.statsUpdate()
@@ -717,7 +833,7 @@ object Cache {
                     }
                 }
                 //BFEAC检测
-                Glogger.info("BFEAC批量检查")
+                //Glogger.info("BFEAC批量检查")
                 val cacheBan: MultiCheckResponse
                 val cacheList = MultiCheckPostJson()
                 PlayerListInfo.forEach { data ->
@@ -733,6 +849,7 @@ object Cache {
                                 if (kick.isSuccessful)
                                     sendMessage(data.gameID, "挂钩${data.id}在//SC//服被狠狠上市了")
                                 else {
+                                    Glogger.error("挂钩${data.id}踢不动,他在//SC//服")
                                     sendMessage(data.gameID, "挂钩${data.id}踢不动,他在//SC//服")
                                 }
                             }
@@ -744,7 +861,7 @@ object Cache {
 
             }
         }
-        Glogger.info("玩家整理完毕 现存数量:${PlayerListInfo.size}")
+        //Glogger.info("玩家整理完毕 现存数量:${PlayerListInfo.size}")
     }
 
     /**
@@ -752,30 +869,20 @@ object Cache {
      * @param gameID String
      * @param msg Any
      */
-    fun sendMessage(gameID: String, msg: Any) {
-        if (lastMsg == msg)  return
-        CoroutineScope(Dispatchers.IO).launch {
-            run p@{
-                GroupSetting.groupSetting.forEach { ctx ->
+    fun sendMessage(gameID: String, msg: String) {
+        GroupSetting.groupSetting.forEach { ctx ->
+            CoroutineScope(Dispatchers.IO).launch {
+                if (lastMsg != msg) {
                     ctx.games.forEach {
                         if (it.gameID == gameID && it.isEnableBroadcast) {
+                            val _msg = msg.replace("//SC//", it.name)
                             GlobalBots.forEach { bot ->
-                                val p = if (msg is String) {
-                                    val text = msg.replace("//SC//", it.name)
-                                    lastMsg = text
-                                    text.toPlainText()
-                                } else if (msg is Message) {
-                                    msg
-                                } else {
-                                    msg.toString().toPlainText()
-                                }
-                                runBlocking {
-                                    ctx.groupID?.let { it1 -> bot.getGroup(it1)?.sendMessage(p) }
-                                    delay(5000)
-                                }
+                                ctx.groupID?.let { it1 -> bot.getGroup(it1)?.sendMessage(_msg.toPlainText()) }
+                                delay(5000)
                             }
                         }
                     }
+                    lastMsg = msg
                 }
             }
         }

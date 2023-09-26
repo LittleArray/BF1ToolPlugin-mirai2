@@ -33,14 +33,14 @@ object ServerManagement {
         }
         var player = 0
         Cache.PlayerListInfo.forEach { pldata ->
-            if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+            if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                 player++
             }
         }
         if (player > 1) {
             var temp = "找到多个ID,无法确认\n"
             Cache.PlayerListInfo.forEach { pldata ->
-                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                     temp += "ID:${pldata.id} 在 队伍${pldata.team}\n"
                 }
             }
@@ -48,7 +48,7 @@ object ServerManagement {
         } else if (player == 1) {
             var result = "找不到此玩家"
             Cache.PlayerListInfo.forEach { pldata ->
-                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                     runBlocking {
                         result = if (pldata.kick(kickR).isSuccessful) {
                             "踢出成功 ${pldata.id}"
@@ -117,17 +117,23 @@ object ServerManagement {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*av <ServerCount> <ID> <Time>").toPlainText()
         val name = I.sp[1]
+        val time = try {
+            I.sp[3].toFloat()
+        }catch (e:Exception){
+            return CustomerLang.parameterErr.replace("//para//", "*av <ServerCount> <ID> <Time>").toPlainText()
+        }
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val serverVIP = BF1Api.addServerVIP(server.sessionId.toString(), server.serverRspID, I.sp[2])
         if (serverVIP.isSuccessful || serverVIP.reqBody.indexOf("RspErrUserIsAlreadyVip") != -1) {
-            /*if (I.cmdSize > 2) {
-                Setting.addVip(I.event.group.id, serverCount, I.sp[2], I.sp[3])
+            if (I.cmdSize > 2) {
+                ServerInfos.addVip(server.gameID!!,I.sp[2],time)
                 return CustomerLang.addVIPSucc
                     .replace("//id//", I.sp[2])
-                    .replace("//serverCount//", "$serverCount")
-                    .replace("//Time//", "${I.sp[3]}天的")
+                    .replace("//serverCount//", name)
+                    .replace("//Time//", "${time}天的")
                     .toPlainText()
-            }*/
+            }
+            ServerInfos.addVip(server.gameID!!,I.sp[2],9999F)
             return CustomerLang.addVIPSucc
                 .replace("//id//", I.sp[2])
                 .replace("//serverCount//", name)
@@ -148,6 +154,7 @@ object ServerManagement {
         val pid = BF1Api.getPersonaid(I.sp[2])
         val serverVIP = BF1Api.removeServerVIP(server.sessionId.toString(), server.serverRspID, pid.id.toString())
         return if (serverVIP.isSuccessful) {
+            ServerInfos.removeVip(server.gameID!!,I.sp[2])
             CustomerLang.unVIPSucc.replace("//id//", I.sp[2]).replace("//serverCount//", name).toPlainText()
         } else {
             CustomerLang.unVIPErr.replace("//id//", I.sp[2]).replace("//err//", serverVIP.reqBody).toPlainText()
@@ -195,14 +202,14 @@ object ServerManagement {
             .toPlainText()
         var player = 0
         Cache.PlayerListInfo.forEach { pldata ->
-            if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+            if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                 player++
             }
         }
         if (player > 1) {
             var temp = "找到多个ID,无法确认\n"
             Cache.PlayerListInfo.forEach { pldata ->
-                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                     temp += "ID:${pldata.id} 在 队伍${pldata.team}\n"
                 }
             }
@@ -210,7 +217,7 @@ object ServerManagement {
         } else if (player == 1) {
             var result = "换边失败"
             Cache.PlayerListInfo.forEach { pldata ->
-                if (pldata.id.indexOf(I.sp[1], 0, false) != -1) {
+                if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                     runBlocking {
                         if (pldata.move().isSuccessful) {
                             result = "换边..成功了吗?如换 ${pldata.id}"
@@ -226,108 +233,21 @@ object ServerManagement {
 
     //TODO 查询VIP实现
     fun getVipList(I: PullIntent): Message {
-        return "正在重构".toPlainText()
-    }
-
-    /*//TODO 绑定服务器实现
-    fun bindingServer(I: PullIntent): Message {
-        if (I.isAdmin) {
-            when (I.cmdSize) {
-                in 1..2 -> {
-                    var temp = "绑定的服务器\n"
-                    Setting.groupData[I.event.group.id]?.server?.forEachIndexed { index, it ->
-                        temp += """
-                            Server:${index + 1}:
-                            ServerName:${it.serverName}
-                            ServerGuid:${it.serverGuid}
-                            GameID:${it.gameID}
-                        """.trimIndent() + "\n"
-                    }
-                    return temp.toPlainText()
+        if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*gv <ServerCount>").toPlainText()
+        val name = I.sp[1]
+        val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        var temp = "服务器$name 的vip列表如下\n"
+        ServerInfos.serverInfo.forEach {
+            if (server.gameID!! == it.gameID){
+                it.vipList.forEach { id, endTime ->
+                    temp+="ID:${id} 到期时间:${SimpleDateFormat("yyyy-MM-dd HH:mm").format(endTime)}\n"
                 }
-
-                in 3..5 -> {
-                    when (I.sp[1]) {
-                        "add" -> {
-                            return if (I.sp[2].isNotEmpty() && I.sp[3].isNotEmpty()) {
-                                if (Setting.groupData[I.event.group.id]?.server?.add(
-                                        DataForGroup.ServerInfoForSave(
-                                            serverGuid = I.sp[2],
-                                            serverName = I.sp[3]
-                                        )
-                                    ) == true
-                                ) {
-                                    "成功".toPlainText()
-                                } else {
-                                    "已存在该绑定".toPlainText()
-                                }
-                            } else {
-                                CustomerLang.parameterErr.replace("//para//", "*bds add <ServerID> <ServerName>")
-                                    .toPlainText()
-                            }
-                        }
-
-                        "remove" -> {
-                            return if (I.sp[2].isNotEmpty()) {
-                                Setting.groupData[I.event.group.id]?.server?.removeIf {
-                                    it.serverGuid == I.sp[2]
-                                }
-                                "成功".toPlainText()
-                            } else {
-                                CustomerLang.parameterErr.replace("//para//", "*bds remove <ServerID>").toPlainText()
-                            }
-                        }
-
-                        else -> return CustomerLang.parameterErr.replace("//para//", "*bds <add/remove/list>")
-                            .toPlainText()
-                    }
-                }
-
-                else -> {
-                    return CustomerLang.errCommand.replace("//err//", "").toPlainText()
-                }
-            }
-        } else {
-            return CustomerLang.notAdminErr.toPlainText()
-        }
-    }
-
-    //TODO 绑定服务器ssid
-    fun bindingServerSessionId(I: PullIntentTemp): Message {
-        if (I.isAdmin) {
-            if (I.cmdSize > 2) {
-                val apiLocale = BF1Api.setAPILocale(I.sp[2])
-                if (!apiLocale.isSuccessful) return "失败请重试\n${apiLocale.reqBody}".toPlainText()
-                val ssid = BF1Api.getWelcomeMessage(I.sp[2])
-                if (!ssid.isSuccessful) return "失败请重试\n${apiLocale.reqBody}".toPlainText()
-                return if (I.sp[1] == "All") {
-                    setBindServer(I.event.group.id, "All", I.sp[2])
-                    "绑定成功\n${ssid.firstMessage}".toPlainText()
-                } else {
-                    setBindServer(I.event.group.id, I.sp[1], I.sp[2])
-                    "绑定成功\n${ssid.firstMessage}".toPlainText()
-                }
-            } else {
-                return CustomerLang.parameterErr.replace("//para//", "*bdssid <ServerID> <SessionID>").toPlainText()
-            }
-        } else {
-            return CustomerLang.notAdminErr.toPlainText()
-        }
-    }
-
-    //TODO 修改绑定服务器
-    fun setBindServer(gid: Long, serverID: String, sessionId: String = ""): Boolean {
-        Setting.groupData[gid]?.server?.forEach {
-            if (serverID == "All") {
-                it.sessionId = sessionId
-            }
-            if (it.serverGuid == serverID) {
-                it.sessionId = sessionId
             }
         }
-        return true
+        return temp.toPlainText()
     }
-*/
+
     //TODO 修改服务器kd实现
     fun setKDInfo(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()

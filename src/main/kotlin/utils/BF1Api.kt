@@ -208,8 +208,6 @@ object BF1Api {
     //22玩家列表数据接口
     fun getPlayerListBy22(gameId: String,isLog:Boolean = true): PLBy22 {
         try {
-            if (isLog)
-                Glogger.info("pl请求:${gameId}")
             val url = "https://blaze.2788.pro/GameManager.getGameDataFromId"
             val json = "{\"DNAM String\": \"csFullGameList\", \"GLST List<Integer>\": [$gameId]}"
             val request = Request.Builder()
@@ -226,30 +224,28 @@ object BF1Api {
             if (response.isSuccessful) {
                 val res = response.body?.string()
                 if (res != null) {
-                    if (isLog)
-                        if (res.length > 32) Glogger.info("数据Api请求成功:${res.subSequence(0, 31)}") else Glogger.info("数据Api请求成功:${res}")
                     val plBy22 = Gson().fromJson(res, PLBy22::class.java)
                     return plBy22.copy(isSuccessful = true)
                 } else {
                     if (isLog)
-                        Glogger.error("数据Api请求失败")
+                        Glogger.error("玩家列表Api请求失败 GameID:${gameId}")
                     return PLBy22(isSuccessful = false)
                 }
             } else {
                 val res = response.body?.string()
                 if (res != null) {
                     if (isLog)
-                        Glogger.error("数据Api请求失败:${res}")
+                        Glogger.error("玩家列表Api请求失败 GameID:${gameId} ERR:${res}")
                     return PLBy22(isSuccessful = false)
                 } else {
                     if (isLog)
-                        Glogger.error("数据Api请求失败")
+                        Glogger.error("玩家列表Api请求失败 GameID:${gameId}")
                     return PLBy22(isSuccessful = false)
                 }
             }
         } catch (ex: Exception) {
             if (isLog)
-                Glogger.error("数据Api请求出错${ex.stackTraceToString()}")
+                Glogger.error("玩家列表Api请求出错 GameID:${gameId} ERR:${ex.stackTraceToString()}")
             return PLBy22(isSuccessful = false)
         }
 

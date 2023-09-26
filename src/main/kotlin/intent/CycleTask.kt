@@ -3,6 +3,7 @@ package top.ffshaozi.intent
 import net.mamoe.mirai.message.data.Message
 import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.NeriQQBot
+import top.ffshaozi.config.ServerInfos
 import top.ffshaozi.utils.BF1Api
 
 
@@ -30,28 +31,26 @@ object CycleTask {
         Cache.VipCThreadPool = Thread {
             while (Cache.VipAlive) {
                 //移除VIP
-                /*groupData.forEach { groupID, Data ->
-                    Data.server.forEach {
-                        var removeID = ""
-                        it.vipList.forEach { (id, endTime) ->
-                            if (System.currentTimeMillis() > endTime) {
-                                removeID = id
-                            }
-                        }
-                        if (removeID.isNotEmpty()) {
-                            val pid = BF1Api.getPersonaid(removeID)
-                            if (BF1Api.removeServerVIP(
-                                    it.sessionId.toString(),
-                                    it.serverRspID,
-                                    pid.id.toString()
-                                ).isSuccessful
-                            ) {
-                                it.vipList.remove(removeID)
-                                Cache.sendMessage(it.gameID.toString(), "已移除${removeID}的Vip,原因:过期了")
-                            }
+                ServerInfos.serverInfo.forEach {
+                    var removeID = ""
+                    it.vipList.forEach { (id, endTime) ->
+                        if (System.currentTimeMillis() > endTime) {
+                            removeID = id
                         }
                     }
-                }*/
+                    if (removeID.isNotEmpty()) {
+                        val pid = BF1Api.getPersonaid(removeID)
+                        if (BF1Api.removeServerVIP(
+                                it.sessionId.toString(),
+                                it.serverRspID,
+                                pid.id.toString()
+                            ).isSuccessful
+                        ) {
+                            it.vipList.remove(removeID)
+                            Cache.sendMessage(it.gameID.toString(), "已移除${removeID}的Vip,原因:过期了")
+                        }
+                    }
+                }
                 NeriQQBot.Glogger.info("VIP管理服务")
                 Thread.sleep(10000)
             }

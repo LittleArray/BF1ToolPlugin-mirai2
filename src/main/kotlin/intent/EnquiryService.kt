@@ -4,13 +4,12 @@ import kotlinx.coroutines.*
 import net.mamoe.mirai.contact.Contact.Companion.uploadImage
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.*
-import top.ffshaozi.config.Bindings
-import top.ffshaozi.config.CustomerLang
-import top.ffshaozi.config.ServerInfos
-import top.ffshaozi.config.Setting
+import top.ffshaozi.config.*
 import top.ffshaozi.utils.*
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.collections.HashMap
 
 
 /*** 搜索实现
@@ -55,9 +54,10 @@ object EnquiryService {
     }
 
     //TODO 查询自己实现
-    suspend fun searchMe(I: PullIntent): Any {
+    suspend fun searchMe(I: PullIntent): Message {
         var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
+        if (I.cmdSize > 2) BackgroundImgData.addImgOrDef(I.event.sender.id,"stats",I.sp[2])
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
             Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
@@ -68,6 +68,7 @@ object EnquiryService {
         val name = id
         val allStats = BF1Api.getAllStats(name)
         if (allStats.isSuccessful) {
+            val backImg = BackgroundImgData.backgroundImgData[I.event.sender.id]?.statsImg ?: "assets/MP_Blitz.jpg"
             val htmlToImage = HtmlToImage()
             val content = htmlToImage.readIt("stats")
             var res = content
@@ -98,7 +99,9 @@ object EnquiryService {
                 .replace("-DkillAssists", "${allStats.killAssists}")
                 .replace("-DhighestKillStreak", "${allStats.highestKillStreak}")
                 .replace("-DlongestHeadShotm", "${allStats.longestHeadShot}")
+                .replace("-DACTP", "${allStats.activePlatoon?.name}")
                 .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
+                .replace("assets/MP_Blitz.jpg", backImg)
             if (allStats.activePlatoon != null) {
                 if (allStats.activePlatoon.emblem != null && allStats.activePlatoon.tag != null) {
                     val cacheImg =
@@ -171,6 +174,7 @@ object EnquiryService {
             var classText = ""
             var vpText = ""
             var gameWinText = ""
+            var plText = ""
             allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEachIndexed { index, weapon ->
                 if (index < 3) {
                     htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
@@ -215,8 +219,12 @@ object EnquiryService {
                     .replace("WINS", gamemodes.wins.toString())
                     .replace("LOSSES", gamemodes.losses.toString())
             }
+            allStats.platoons?.forEachIndexed { index, platoon ->
+                if (index < 4)
+                    plText += "[${platoon.tag}]"
+            }
             res = res.replace("WPTEXT", wpText).replace("VPTEXT", vpText).replace("CLTEXT", classText)
-                .replace("GAMEWINTEXT", gameWinText)
+                .replace("GAMEWINTEXT", gameWinText).replace("-DPLIST", plText)
             var eacState = "無記錄"
             val eacInfoJson = BF1Api.searchBFEAC(name)
             if (eacInfoJson.error_code == 0) {
@@ -332,6 +340,7 @@ object EnquiryService {
         }
         var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
+        if (I.cmdSize > 2) BackgroundImgData.addImgOrDef(I.event.sender.id,"weapon",I.sp[2])
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
             Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
@@ -342,6 +351,7 @@ object EnquiryService {
         val name = id
         val allStats = BF1Api.getAllStats(name)
         if (allStats.isSuccessful) {
+            val backImg = BackgroundImgData.backgroundImgData[I.event.sender.id]?.weaponImg ?: "assets/MP_London.jpg"
             val htmlToImage = HtmlToImage()
             val content = htmlToImage.readIt("weapon")
             var res = content
@@ -354,6 +364,7 @@ object EnquiryService {
                 .replace("-DLKD", "${allStats.killDeath}")
                 .replace("-DLKPM", "${allStats.killsPerMinute}")
                 .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
+                .replace("assets/MP_London.jpg", backImg)
                 .replace(
                     "-DKILLS",
                     if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
@@ -445,6 +456,7 @@ object EnquiryService {
     suspend fun searchVehicle(I: PullIntent): Message {
         var id = Bindings.getBinding(I.event.group.id, I.event.sender.id)
         if (I.cmdSize > 1) id = I.sp[1]
+        if (I.cmdSize > 2) BackgroundImgData.addImgOrDef(I.event.sender.id,"vehicle",I.sp[2])
         if (id.isEmpty()) {
             id = I.event.sender.nameCard
             Bindings.addBinding(I.event.group.id, I.event.sender.id, id)
@@ -455,6 +467,7 @@ object EnquiryService {
         val name = id
         val allStats = BF1Api.getAllStats(name)
         if (allStats.isSuccessful) {
+            val backImg = BackgroundImgData.backgroundImgData[I.event.sender.id]?.vehicleImg ?: "assets/MP_Volga.jpg"
             val htmlToImage = HtmlToImage()
             val content = htmlToImage.readIt("vehicle")
             var res = content
@@ -467,6 +480,7 @@ object EnquiryService {
                 .replace("-DLKD", "${allStats.killDeath}")
                 .replace("-DLKPM", "${allStats.killsPerMinute}")
                 .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
+                .replace("assets/MP_Volga.jpg", backImg)
                 .replace(
                     "-DKILLS",
                     if (allStats.kills != null && allStats.kills > 10000) "${allStats.kills.div(100)} ★" else "${allStats.kills}"
@@ -553,16 +567,13 @@ object EnquiryService {
                 serverSearchJson.servers?.forEachIndexed { index, it ->
                     temp += """
                          ===================
-                         服务器 ${index + 1} 
-                         名称:${it.prefix!!.substring(0, 30)}
-                         局内人数:${it.serverInfo} 观战人数:${it.inSpectator}
-                         当前地图:${it.currentMap}
-                         
-                         GameID:
-                         ${it.gameId}
-                         ServerID:
-                         ${it.serverId}
+                         ${it.prefix!!.substring(0, 30)}...
+                         ${it.currentMap} - ${it.mode} ${it.serverInfo} (${it.inSpectator})
+                         GameID:${it.gameId}
                     """.trimIndent() + "\n"
+                }
+                if (serverSearchJson.servers?.size == 0) {
+                    temp = "没有找到对应服务器"
                 }
                 temp.toPlainText()
             } else {
@@ -573,7 +584,49 @@ object EnquiryService {
         }
     }
 
-    //TODO 查询服务器玩家列表的实现
+    /**
+     * 查询历史老毕登
+     * @param I PullIntent
+     * @return Message
+     */
+    fun searchHistory(I: PullIntent): Message {
+        if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
+        if (I.cmdSize < 1) return CustomerLang.parameterErr.replace("//para//", "*ls <ServerCount>").toPlainText()
+        val name = I.sp[1]
+        val server = ServerInfos.getServerByName(I.event.group.id, name) ?: return CustomerLang.nullServerErr.replace(
+            "//err//",
+            name
+        ).toPlainText()
+        val comparator = kotlin.Comparator { key1: Int, key2: Int -> key2.compareTo(key1) }
+        val map = TreeMap<Int, String>(comparator)
+        var temp = "服务器$name 的历史进服数据\n"
+        HistoryLog.log.forEach { id, data ->
+            val sp = data.split(" ")
+            if (sp[1] == server.gameID!!) {
+                map[sp[2].toInt()] = (map[sp[2].toInt()] ?: "") + ",$id"
+            }
+        }
+        map.forEach { time, id ->
+            if (time > 5){
+                var ids = ""
+                val sp = id.split(",")
+                sp.forEachIndexed{index, s ->
+                    if (index != 0) {
+                        val isBinding = Bindings.bindingData.any {it.value == s}
+                        ids+="ID:$s ${if (isBinding) "是群友" else ""} \n"
+                    }
+                }
+                temp += "进服次数:$time \n${ids}  \n"
+            }
+        }
+        return temp.toPlainText()
+    }
+
+    /**
+     * 查询服务器玩家列表的实现
+     * @param I PullIntent
+     * @return Message
+     */
     fun searchServerList(I: PullIntent): Message {
         if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*pl <ServerCount>").toPlainText()
         val name = I.sp[1]
@@ -584,7 +637,7 @@ object EnquiryService {
         team2.add(I.event.bot, PlainText("队伍2"))
         val blackTeam = ForwardMessageBuilder(I.event.group)
         blackTeam.add(I.event.bot, PlainText("黑队查询"))
-        val gameid = ServerInfos.getGameIDByName(I.event.group.id,name)
+        val gameid = ServerInfos.getGameIDByName(I.event.group.id, name)
         if (gameid.isEmpty()) return msg
         var groupPlayer = 0
         var opPlayer = 0
@@ -599,22 +652,43 @@ object EnquiryService {
         val htmlToImage = HtmlToImage()
         val text = htmlToImage.readIt("playerList")
         //background-color: rgb(86, 196, 73);
-        val player =
-            "<div class=\"player\"><div class=\"index\">INDEX</div><div class=\"rank\"  style=\"rankback\">RANK</div><div class=\"black\">BLACK_TEXT</div><div style=\"color: #fff;id\" class=\"name\">NAME</div><div style=\"color: #fff;lkd\" class=\"lifeKD\">LIFE_KD</div><div style=\"color: #fff;lkp\" class=\"lifeKPM\">LIFE_KPM</div><div style=\"color: #fff;rkd\" class=\"RKD\">R_KD</div><div style=\"color: #fff;rkp\" class=\"RKPM\">R_KPM</div><div class=\"time\">TIME分</div><div class=\"latency\">PINGms</div></div>"
+        val player ="""
+            <div class="player">
+                <div class="index">INDEX</div>
+                <div class="rank"  style="rankback">RANK</div>
+                <div class="black">BLACK_TEXT</div>
+                <div style="color: #fff;id" class="name">NAME</div>
+                <div style="color: #fff;lkd" class="lifeKD">LIFE_KD</div>
+                <div style="color: #fff;lkp" class="lifeKPM">LIFE_KPM</div>
+                <div style="color: #fff;rkd" class="RKD">R_KD</div>
+                <div style="color: #fff;rkp" class="RKPM">R_KPM</div>
+                <div class="time">TIME分</div>
+                <div class="latency">PINGms</div>
+                <div class="latency">LANG</div>
+            </div>
+        """.trimIndent()
         val platoonSet: MutableSet<String> = mutableSetOf()
-        val blackTeamSet: MutableSet<String> = mutableSetOf()
+        val blackPlayerSet: HashMap<String, MutableList<String>> = hashMapOf()
         Cache.PlayerListInfo.forEach { players ->
             if (gameid == players.gameID) {
-                players.platoonList.forEach {
-                    platoonSet.forEach {
-                        players.platoonList.forEach {p->
-                            if (it == p) {
-                                blackTeamSet.add(players.id)
-
+                players.platoonTagList.forEach {
+                    platoonSet.add(it)
+                }
+            }
+        }
+        Cache.PlayerListInfo.forEach { players ->
+            platoonSet.forEach {
+                players.platoonTagList.forEach { p ->
+                    if (it == p) {
+                        if (blackPlayerSet[p].isNullOrEmpty()) {
+                            blackPlayerSet[p] = mutableListOf()
+                            blackPlayerSet[p]!!.add(players.id)
+                        } else {
+                            if (!blackPlayerSet[p]!!.any { it == players.id }) {
+                                blackPlayerSet[p]!!.add(players.id)
                             }
                         }
                     }
-                    platoonSet.add(it)
                 }
             }
         }
@@ -642,16 +716,20 @@ object EnquiryService {
                 color = "aqua"
                 if (it.botState == "Loading") loadingBots++
             }
-            blackTeamSet.forEach { pa ->
-                if (it.id == pa) {
-                    if (!it.isBot) {
-                        blackText = "[!]"
-                        blackPlayer++
+            if (!it.isBot) {
+                blackPlayerSet.forEach { (p, data) ->
+                    if (data.size > 1) {
+                        data.forEach { id ->
+                            if (id == it.id) {
+                                blackText = "[!]"
+                                blackPlayer++
+                            }
+                        }
                     }
                 }
             }
             Bindings.bindingData.forEach { p ->
-                if (p.value.indexOf(it.id, 0, true) != -1) {
+                if (p.value == it.id) {
                     color = "pink"
                     groupPlayer++
                 }
@@ -678,6 +756,9 @@ object EnquiryService {
                         "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
                     )
                     .replace("PING", "${it.latency}")
+                    .replace("LANG",
+                        it.langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
+                    )
                     .replace("LIFE_KD", "${it.lkd}")
                     .replace("LIFE_KPM", "${it.lkp}")
                     .replace("R_KD", "${it.rkd}")
@@ -704,6 +785,9 @@ object EnquiryService {
                         "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
                     )
                     .replace("PING", "${it.latency}")
+                    .replace("LANG",
+                        it.langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
+                    )
                     .replace("LIFE_KD", "${it.lkd}")
                     .replace("LIFE_KPM", "${it.lkp}")
                     .replace("R_KD", "${it.rkd}")
@@ -783,9 +867,9 @@ object EnquiryService {
     //TODO 搜索服务器玩家
     fun searchServerListPlayer(I: PullIntent): Message {
         if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*ssi <ServerCount> <ID>").toPlainText()
-        val name =  I.sp[1]
-        val gameID = ServerInfos.getGameIDByName(I.event.group.id,name)
-        if (gameID.isBlank()) return  CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        val name = I.sp[1]
+        val gameID = ServerInfos.getGameIDByName(I.event.group.id, name)
+        if (gameID.isBlank()) return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val serverListJson = BF1Api.searchServerList(gameID)
         return if (serverListJson.isSuccessful == true) {
             var p = "在服务器${name}中查找到\n"
@@ -799,6 +883,69 @@ object EnquiryService {
             p.toPlainText()
         } else {
             CustomerLang.searchErr.replace("//action//", "服务器玩家").toPlainText()
+        }
+    }
+
+    /**
+     * 查询黑队
+     * @param I PullIntent
+     */
+    fun searchBlackTeam(I: PullIntent): Message {
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*chd <ServerCount>").toPlainText()
+        val name = I.sp[1]
+        val gameID = ServerInfos.getGameIDByName(I.event.group.id, name)
+        if (gameID.isBlank()) return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        //记录服务器内所以战队
+        val platoonSet: MutableSet<String> = mutableSetOf()
+        //记录ID
+        val blackPlayerSet: HashMap<String, MutableList<String>> = hashMapOf()
+        Cache.PlayerListInfo.forEach { players ->
+            if (gameID == players.gameID) {
+                players.platoonTagList.forEach {
+                    platoonSet.add(it)
+                }
+            }
+        }
+        Cache.PlayerListInfo.forEach { players ->
+            platoonSet.forEach {
+                players.platoonTagList.forEach { p ->
+                    if (it == p) {
+                        if (blackPlayerSet[p].isNullOrEmpty()) {
+                            blackPlayerSet[p] = mutableListOf()
+                            blackPlayerSet[p]!!.add(players.id)
+                        } else {
+                            if (!blackPlayerSet[p]!!.any { it == players.id }) {
+                                blackPlayerSet[p]!!.add(players.id)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return I.event.buildForwardMessage {
+            add(
+                I.event.bot.id, "唧唧", """
+                服务器中拥有战队:${platoonSet}
+            """.trimIndent().toPlainText()
+            )
+            blackPlayerSet.forEach { (p1, _) ->
+                var temp = "战队:[${p1}]\n"
+                var size = 0
+                blackPlayerSet.forEach { p, data ->
+                    if (p1 == p) {
+                        if (data.size > 1) {
+                            data.forEach {
+                                temp += "$it \n"
+                                size++
+                            }
+                        }
+                    }
+                }
+                if (size > 1) {
+                    add(I.event.bot.id, "唧唧", temp.toPlainText())
+                }
+            }
+
         }
     }
 }
