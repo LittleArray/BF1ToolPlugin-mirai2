@@ -6,10 +6,13 @@ import data.BotsJson
 import top.ffshaozi.data.eac.MultiCheckPostJson
 import top.ffshaozi.data.eac.MultiCheckResponse
 import kotlinx.coroutines.*
+import net.mamoe.mirai.console.data.ValueDescription
+import net.mamoe.mirai.console.data.value
 import net.mamoe.mirai.message.data.toPlainText
 import top.ffshaozi.NeriQQBot.GlobalBots
 import top.ffshaozi.NeriQQBot.Glogger
 import top.ffshaozi.config.*
+import top.ffshaozi.config.CustomerLang.provideDelegate
 import top.ffshaozi.data.ea.Stats
 import top.ffshaozi.utils.BF1Api
 import top.ffshaozi.utils.BF1Api.getPlayerListBy22
@@ -74,6 +77,34 @@ object Cache {
         "Conquest" to "征服模式",
         "BreakthroughLarge" to "行动模式",
     )
+
+    val help ="""
+        Nekomura Haruka の BF1QQRobot v1.0.4
+        通用指令:
+        !help -帮助
+        !bd <Id> -绑定EAID
+        !eac <Id> -查询BFEAC的Ban
+        !c <Id?> -查询数据
+        !wp <Id?> -查询武器
+        !<武器类型> <Id?> -查询<武器类型>的数据
+        !vp <Id?> -查询载具
+        !rec <Id?> -查询最近账号数据
+        !pl <SerName> -查询服务器内玩家列表
+        !ss <SerName> -查询服务器
+    """.trimIndent()
+
+    val helpAdmin = """
+        管理可用指令
+        !k <Id> <理由(繁体或英文)> -踢人 快速理由:!zz 禁止蜘蛛人 *tj 禁止偷家 *nf 暖服战神 *ur 违反规则
+        !b <SerName> <Id> -Ban人
+        !rb <SerName> <Id> -取消ban
+        !av <SerName> <Id> <Time?> -添加vip 时间单位为天,允许小数
+        !rv <SerName> <Id> -移除vip
+        !gv <SerName> -获取群内vip玩家列表
+        !gb <SerName> -获取ban玩家列表
+        !setkd <SerName> <lkd/lkp/rkd/rkp> <Float> -设置服务器kd等数据
+        !抗压 <Id?> -命令解释:设置服务器临时抗压白名单
+    """.trimIndent()
 
     data class ServerInfo(
         var map: String = "",

@@ -32,10 +32,6 @@ class HtmlToImage {
         val cmd =
             "\"${chromePath}\" --no-sandbox --headless --disable-gpu --screenshot=\"${plImg}\"  --window-size=${width},${height} \"${tempFile}\""
         val process = Runtime.getRuntime().exec(cmd)
-        CoroutineScope(Dispatchers.IO).launch {
-            delay(15000)
-            Runtime.getRuntime().exec("taskkill /f /im chrome.exe")
-        }
         process.waitFor()
         runBlocking {
             delay(1000)

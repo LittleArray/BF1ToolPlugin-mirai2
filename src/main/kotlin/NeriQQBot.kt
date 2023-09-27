@@ -78,27 +78,6 @@ object NeriQQBot : KotlinPlugin(
                     BotGroups = BotGroups + group.name + "   " + group.id + ","
                 }
                 logger.info("获取到的群聊 $BotGroups")
-                Glogger.info("重注册${bot.id}群临时会话事件响应 ")
-                bot.eventChannel.subscribeGroupTempMessages {
-                    startsWith("*") reply { s ->
-                        var temp: Any? = null
-                        GroupSetting.groupSetting.forEach {
-                            temp = if (it.groupID == this.group.id) {
-                                var isAdmin = false
-                                this.group.members.forEach { normalMember ->
-                                    if (normalMember.permission.level != 0 && normalMember.id == this.sender.id) isAdmin = true
-                                }
-                                it.operator.forEach {
-                                    if (it == this.sender.id) isAdmin = true
-                                }
-                                Intent.runTemp(this, s, isAdmin)
-                            } else {
-                                Unit
-                            }
-                        }
-                        temp
-                    }
-                }
                 Glogger.info("重注册${bot.id}群会话事件响应 ")
                 bot.eventChannel.subscribeGroupMessages {
                     GroupSetting.groupSetting.forEach {

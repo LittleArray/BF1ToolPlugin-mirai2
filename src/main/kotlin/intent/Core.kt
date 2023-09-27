@@ -17,35 +17,6 @@ import java.util.*
 
 
 object Intent {
-    fun runTemp(groupTempMessageEvent: GroupTempMessageEvent, msg: String, isAdmin: Boolean): Any {
-        val sp = msg.split(" ")
-        val cmdSize = sp.size
-        val pullIntent = PullIntentTemp(
-            event = groupTempMessageEvent,
-            sp = sp,
-            isAdmin = isAdmin,
-            cmdSize = cmdSize
-        )
-        var result: Message? = null
-        val cmdList = hashMapOf(
-            listOf("*bdssid", "*绑定服务器ssid") to { "重构中".toPlainText() },
-        )
-        cmdList.forEach { v ->
-            v.key.forEach {
-                if (it == sp[0].lowercase(Locale.getDefault())) {
-                    logger.warning(it)
-                    logger.warning(sp.toString())
-                    result = v.value()
-                }
-            }
-        }
-        return if (result is Message) {
-            NeriQQBot.Glogger.info("临时消息处理...")
-            result as Message
-        } else {
-            PlainText(CustomerLang.errCommand.replace("//err//", msg))
-        }
-    }
 
     suspend fun run(event: GroupMessageEvent, msg: String, isAdmin: Boolean): Any {
         val sp = msg.split(" ")
@@ -57,7 +28,21 @@ object Intent {
             cmdSize = cmdSize
         )
         val vp =
-            listOf("*冲锋枪", "*霰弹枪", "*轻机枪", "*配备", "*半自动步枪", "*配枪", "*近战武器", "*步枪", "*制式步枪","*手枪","*副武器","*佩枪","*机枪")
+            listOf(
+                "冲锋枪",
+                "霰弹枪",
+                "轻机枪",
+                "配备",
+                "半自动步枪",
+                "配枪",
+                "近战武器",
+                "步枪",
+                "制式步枪",
+                "手枪",
+                "副武器",
+                "佩枪",
+                "机枪"
+            )
         var result: Any? = null
         val cmdList = hashMapOf(
             CustomerCmd.help to { runBlocking { help(pullIntent) } },
@@ -67,7 +52,7 @@ object Intent {
             CustomerCmd.ss to { runBlocking { EnquiryService.searchServer(pullIntent) } },
             CustomerCmd.searchHistory to { runBlocking { EnquiryService.searchHistory(pullIntent) } },
             CustomerCmd.ssi to { runBlocking { EnquiryService.searchServerListPlayer(pullIntent) } },
-            CustomerCmd.stats to { runBlocking { EnquiryService.searchMe(pullIntent) }  },
+            CustomerCmd.stats to { runBlocking { EnquiryService.searchMe(pullIntent) } },
             CustomerCmd.vehicle to { runBlocking { EnquiryService.searchVehicle(pullIntent) } },
             CustomerCmd.weapon to { runBlocking { EnquiryService.searchWp(pullIntent) } },
             CustomerCmd.recently to { runBlocking { EnquiryService.searchRecently(pullIntent) } },
@@ -84,12 +69,18 @@ object Intent {
             CustomerCmd.removeVip to { runBlocking { ServerManagement.unVipPlayer(pullIntent) } },
             CustomerCmd.searchVip to { runBlocking { ServerManagement.getVipList(pullIntent) } },
             CustomerCmd.searchBan to { runBlocking { ServerManagement.getBanList(pullIntent) } },
-            vp to {  vpType: String? -> runBlocking { EnquiryService.searchWp(pullIntent, vpType) } },
+            vp to { vpType: String? -> runBlocking { EnquiryService.searchWp(pullIntent, vpType) } },
         )
         cmdList.forEach { v ->
             v.key.forEach {
-                if (it == sp[0].lowercase(Locale.getDefault())) {
-                    result = v.value(it)
+                if (CustomerCmd.prefix.any { prefix -> msg.lowercase(Locale.getDefault()).indexOf(prefix) == 0 }) {
+                    if (it == sp[0].lowercase(Locale.getDefault()).substring(1)) {
+                        result = v.value(it)
+                    }
+                } else {
+                    if (it == sp[0].lowercase(Locale.getDefault())) {
+                        result = v.value(it)
+                    }
                 }
             }
         }
@@ -97,7 +88,7 @@ object Intent {
             NeriQQBot.Glogger.info("群消息处理...")
             result as Message
         } else {
-            if (msg.indexOf("*") == 0) {
+            if (CustomerCmd.prefix.any { msg.indexOf(it) == 0 }) {
                 PlainText(CustomerLang.errCommand.replace("//err//", msg))
             } else {
                 Unit
@@ -109,9 +100,9 @@ object Intent {
     //TODO 帮助实现
     private fun help(I: PullIntent): Message {
         return if (I.isAdmin) {
-            PlainText(CustomerLang.help + "\n\n" + CustomerLang.helpAdmin)
+            PlainText(Cache.help + "\n\n" + Cache.helpAdmin)
         } else {
-            PlainText(CustomerLang.help)
+            PlainText(Cache.help)
         }
     }
 

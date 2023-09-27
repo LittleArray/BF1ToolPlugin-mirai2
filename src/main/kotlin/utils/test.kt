@@ -1,5 +1,7 @@
 package top.ffshaozi.utils
 
+import top.ffshaozi.config.CustomerCmd
+
 
 /**
  * @Description
@@ -14,6 +16,9 @@ fun test() {
     /*val langLong = 1701729619L
     val lang = langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
     println(lang)*/
+/*    if (listOf("!", "！").any{"!c".indexOf(it) == 0}){
+        println("!c".substring(1))
+    }*/
 }
 
 

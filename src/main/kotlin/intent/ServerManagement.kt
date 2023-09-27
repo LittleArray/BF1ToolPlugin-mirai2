@@ -23,12 +23,12 @@ object ServerManagement {
     fun kickPlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*k <ID> <Reason>").toPlainText()
-        var res = "\n"
+        var res = ""
         val kickR = when (I.sp[2]) {
             "*tj" -> "禁止偷家"
             "*zz" -> "禁止蜘蛛人"
             "*ur" -> "違反規則"
-            "*nf" -> "nuan 服战神是吧"
+            "*nf" -> "nuan服战神滾"
             else -> I.sp[2]
         }
         var player = 0
@@ -50,10 +50,11 @@ object ServerManagement {
             Cache.PlayerListInfo.forEach { pldata ->
                 if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
                     runBlocking {
-                        result = if (pldata.kick(kickR).isSuccessful) {
-                            "踢出成功 ${pldata.id}"
+                        val k = pldata.kick(kickR)
+                        result = if (k.isSuccessful) {
+                            CustomerLang.kickSucc.replace("//id//",pldata.id).replace("//res//",kickR).replace("//serverCount//","")
                         } else {
-                            "踢出失败 ${pldata.id}"
+                            CustomerLang.kickErr.replace("//id//",pldata.id).replace("//err//",k.reqBody)
                         }
                     }
                 }
