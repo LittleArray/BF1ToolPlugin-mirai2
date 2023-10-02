@@ -49,53 +49,88 @@ object Cache {
     var lastMsg: String = ""
     var mapCache: HashMap<String, String> = hashMapOf(
         "MP_Desert" to "西奈沙漠",
-        "MP_FaoFortress" to "法欧堡",
-        "MP_Suez" to "苏伊士",
-        "MP_Argonne" to "阿尔贡森林",
+        "MP_FaoFortress" to "法歐堡",
+        "MP_Suez" to "蘇伊士",
+        "MP_Argonne" to "阿爾貢森林",
         "MP_ItalianCoast" to "意大利海岸",
-        "MP_Amiens" to "亚眠",
+        "MP_Amiens" to "亞眠",
         "MP_MountainFort" to "拉粑粑山",
-        "MP_Graveyard" to "决裂",
-        "MP_Forest" to "阿尔贡森林",
-        "MP_Verdun" to "老毕登高地",
+        "MP_Graveyard" to "決裂",
+        "MP_Forest" to "阿爾貢森林",
+        "MP_Verdun" to "老畢登高地",
         "MP_Underworld" to "垃圾要塞",
-        "MP_Fields" to "苏瓦松",
-        "MP_Volga" to "伏尔加河",
-        "MP_Tsaritsyn" to "察里津",
-        "MP_Harbor" to "泽布吕赫",
-        "MP_Naval" to "黑尔戈兰湾",
-        "MP_Giant" to "庞然暗影",
-        "MP_Ridge" to "迫击巴巴",
-        "MP_Chateau" to "流血宴厅",
+        "MP_Fields" to "蘇瓦松",
+        "MP_Volga" to "伏爾加河",
+        "MP_Tsaritsyn" to "察裏津",
+        "MP_Harbor" to "澤布呂赫",
+        "MP_Naval" to "黑爾戈蘭灣",
+        "MP_Giant" to "龐然暗影",
+        "MP_Ridge" to "迫擊巴巴",
+        "MP_Chateau" to "流血宴廳",
         "MP_Offensive" to "索姆河",
-        "MP_ShovelTown" to "尼维尔之夜",
-        "MP_Bridge" to "勃鲁西洛夫关口",
-        "MP_Scar" to "圣康坦的伤痕",
+        "MP_ShovelTown" to "尼維爾之夜",
+        "MP_Bridge" to "勃魯西洛夫關口",
+        "MP_Scar" to "聖康坦的傷痕",
     )
 
     var modeCache: HashMap<String, String> = hashMapOf(
         "Conquest" to "征服模式",
         "BreakthroughLarge" to "行动模式",
     )
-
+    var mapTeamName: HashMap<String, Pair<String,String>> = hashMapOf(
+        "MP_Amiens" to Pair("大英帝國","德意志帝國"),
+        "MP_ItalianCoast" to Pair("奧匈帝國","意大利王國"),
+        "MP_ShovelTown" to Pair("法蘭西共和國","德意志帝國"),
+        "MP_MountainFort" to Pair("奧匈帝國","意大利王國"),
+        "MP_Graveyard" to Pair("德意志帝國","法蘭西共和國"),
+        "MP_FaoFortress" to Pair("奧斯曼帝國","大英帝國"),
+        "MP_Chateau" to Pair("德意志帝國","美利堅合衆國"),
+        "MP_Scar" to Pair("大英帝國","德意志帝國"),
+        "MP_Suez" to Pair("奧斯曼帝國","大英帝國"),
+        "MP_Desert" to Pair("奧斯曼帝國","大英帝國"),
+        "MP_Forest" to Pair("德意志帝國","美利堅合衆國"),
+        "MP_Giant" to Pair("大英帝國","德意志帝國"),
+        "MP_Verdun" to Pair("法蘭西共和國","德意志帝國"),
+        "MP_Trench" to Pair("法蘭西共和國","德意志帝國"),
+        "MP_Underworld" to Pair("法蘭西共和國","德意志帝國"),
+        "MP_Fields" to Pair("德意志帝國","法蘭西共和國"),
+        "MP_Valley" to Pair("奧匈帝國","俄羅斯帝國"),
+        "MP_Bridge" to Pair("奧匈帝國","俄羅斯帝國"),
+        "MP_Tsaritsyn" to Pair("白軍","紅軍"),
+        "MP_Ravines" to Pair("俄羅斯帝國","奧匈帝國"),
+        "MP_Volga" to Pair("白軍","紅軍"),
+        "MP_Islands" to Pair("俄羅斯帝國","德意志帝國"),
+        "MP_Beachhead" to Pair("奧斯曼帝國","大英帝國"),
+        "MP_Harbor" to Pair("德意志帝國","皇家海軍陸戰隊"),
+        "MP_Ridge" to Pair("奧斯曼帝國","大英帝國"),
+        "MP_River" to Pair("意大利王國","奧匈帝國"),
+        "MP_Hell" to Pair("德意志帝國","大英帝國"),
+        "MP_Offensive" to Pair("德意志帝國","大英帝國"),
+        "MP_Naval" to Pair("德意志帝國","皇家海軍陸戰隊"),
+        "MP_Blitz" to Pair("大英帝國","德意志帝國"),
+        "MP_London" to Pair("大英帝國","德意志帝國"),
+        "MP_Alps" to Pair("大英帝國","德意志帝國"),
+    )
     val help ="""
         Nekomura Haruka の BF1QQRobot v1.0.4
+        赞助作者:https://afdian.net/a/LittleArray(目前暂无特殊内容,后面可能会有)
         通用指令:
         !help -帮助
         !bd <Id> -绑定EAID
         !eac <Id> -查询BFEAC的Ban
-        !c <Id?> -查询数据
-        !wp <Id?> -查询武器
-        !<武器类型> <Id?> -查询<武器类型>的数据
-        !vp <Id?> -查询载具
+        !c <Id?> <背景图片网址?> -查询数据 
+        !wp <Id?> <背景图片网址?> -查询武器
+        !<武器类型> <Id?> <背景图片网址?> -查询<武器类型>的数据
+        !vp <Id?> <背景图片网址?> -查询载具
         !rec <Id?> -查询最近账号数据
         !pl <SerName> -查询服务器内玩家列表
         !ss <SerName> -查询服务器
+        背景图请用静态地址,实在不行自己上传到图床,设置null则恢复默认
     """.trimIndent()
 
     val helpAdmin = """
-        管理可用指令
-        !k <Id> <理由(繁体或英文)> -踢人 快速理由:!zz 禁止蜘蛛人 *tj 禁止偷家 *nf 暖服战神 *ur 违反规则
+        管理指令
+        !k <Id> <理由(繁体或英文)> -踢人 快速理由:*zz 禁止蜘蛛人 *tj 禁止偷家 *nf 暖服战神 *ur 违反规则
         !b <SerName> <Id> -Ban人
         !rb <SerName> <Id> -取消ban
         !av <SerName> <Id> <Time?> -添加vip 时间单位为天,允许小数
@@ -103,7 +138,7 @@ object Cache {
         !gv <SerName> -获取群内vip玩家列表
         !gb <SerName> -获取ban玩家列表
         !setkd <SerName> <lkd/lkp/rkd/rkp> <Float> -设置服务器kd等数据
-        !抗压 <Id?> -命令解释:设置服务器临时抗压白名单
+        !抗压 <Id?> -设置服务器临时抗压白名单
     """.trimIndent()
 
     data class ServerInfo(
@@ -152,6 +187,8 @@ object Cache {
         var platoon: String = "",
         var latency: Int,
         var langLong: Long,
+        var acc: String = "0%",
+        var hs: String = "0%",
         var isBot: Boolean = false,
         var botState: String = "",
         var gameID: String = "",
@@ -165,7 +202,7 @@ object Cache {
         /**
          * 当以下数据被改变是将触发自动踢人流程
          */
-        var join_time: Long = 0L
+        var join_time: Long = System.currentTimeMillis()
             set(value) {
                 val old = field
                 field = value
@@ -341,6 +378,8 @@ object Cache {
                     if (stats.killsPerMinute != null && stats.killsPerMinute > 0) player.lkp =
                         stats.killsPerMinute.toFloat()
                     if (player.rank == 0) player.rank = stats.rank ?: 0
+                    player.acc = stats.accuracy ?: "0%"
+                    player.hs = stats.headshots ?: "0%"
                 } else {
                     Glogger.warning("采用备用方案查询 ${player.id} 的生涯数据")
                     val response = BF1Api.getStatsByPID(player.pid.toString(), player.ssid, false)
@@ -817,7 +856,10 @@ object Cache {
                         //Glogger.info("新玩家整理中 :${p.NAME}")
                         val temp = PlayerCache(
                             id = p.NAME,
-                            team = "",
+                            team = if(p.TIDX.toInt() == 0)
+                                mapTeamName[list.GDAT?.get(0)?.ATTR?.level ?: ""]?.first ?:""
+                            else
+                                mapTeamName[list.GDAT?.get(0)?.ATTR?.level ?: ""]?.second ?:"",
                             rank = (p.PATT?.rank ?: "0").toInt(),
                             latency = (p.PATT?.latency ?: "0").toInt(),
                             pid = p.PID,
@@ -843,7 +885,10 @@ object Cache {
                                     it.isBot = botsJson.data.bots.any { it.user == p.NAME }
                                 }
                                 it.gameID = oldGameID.toString()
-                                it.team = ""
+                                it.team = if(p.TIDX.toInt() == 0)
+                                    mapTeamName[list.GDAT?.get(0)?.ATTR?.level ?: ""]?.first ?:""
+                                else
+                                    mapTeamName[list.GDAT?.get(0)?.ATTR?.level ?: ""]?.second ?:""
                                 it.latency = (p.PATT?.latency ?: "0").toInt()
                                 if (p.JGTS != 0L && p.JGTS != -1L) {
                                     it.join_time = p.JGTS

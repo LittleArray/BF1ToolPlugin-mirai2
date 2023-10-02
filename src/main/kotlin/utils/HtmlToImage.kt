@@ -70,7 +70,7 @@ class HtmlToImage {
     }
     fun getImgPath() = "cache/${imgName}.png"
     fun cacheImg(url:String,imgName:String):Boolean{
-        return if (imgName.isNotEmpty()){
+        return if (imgName.isNotEmpty() && url.isNotEmpty()){
             val _imgName = imgName.replace("/","_").replace(" ","_")
             return if (BF1Api.getImg(url,_imgName,true)) {
                 this.imgName = _imgName

@@ -15,6 +15,7 @@ import net.mamoe.mirai.event.subscribeGroupMessages
 import net.mamoe.mirai.event.subscribeGroupTempMessages
 import net.mamoe.mirai.utils.MiraiLogger
 import net.mamoe.mirai.utils.info
+import okhttp3.internal.wait
 import top.ffshaozi.command.BF1Cmd
 import top.ffshaozi.config.*
 import top.ffshaozi.intent.Cache.BotGroups
@@ -61,13 +62,12 @@ object NeriQQBot : KotlinPlugin(
         Glogger.info { "服务器数据加载成功" }
         GroupSetting.reload()
         Glogger.info { "群组数据加载成功" }
-
         //Setting.logerSetting()
-        ServerApi.run(Setting.port)
-        CycleTask.serverManageRefresh()
-        CycleTask.vipRefresh()
         //登录事件
         globalEventChannel().subscribeOnce<BotOnlineEvent> { onlineEvent ->
+            ServerApi.run(Setting.port)
+            CycleTask.serverManageRefresh()
+            CycleTask.vipRefresh()
             Glogger.info("重注册${onlineEvent.bot.id}登录事件响应 ")
             GlobalBots = Bot.instances
             GlobalBots.forEach { bot ->
@@ -99,7 +99,34 @@ object NeriQQBot : KotlinPlugin(
                         if (it.group?.id == p.groupID) {
                             val id = message.replace("\n","").replace("问题：EAID","").replace("答案：","")
                             Glogger.info("${fromId}请求入群:${groupId},入群消息:${id}")
-                            this.group?.sendMessage("${fromNick}[${fromId}]尝试进群,EAID:${id},管理员请核对")
+                            run p@{
+                                BotLog.reEnterServerLog.forEach { (time, data) ->
+                                    val sp = data.split(" ")
+                                    if (sp[0] == id){
+                                        this.group?.sendMessage("""
+                                        ${fromNick}[${fromId}]由于风控进群
+                                        EAID:${id}(有效ID),自动通过
+                                        风控服务器为${sp[1]}
+                                    """.trimIndent())
+                                        accept()
+                                        return@p
+                                    }
+                                }
+                                val stats = BF1Api.getStats(id)
+                                if (stats.rank != 0 || stats.currentRankProgress != 0L){
+                                    this.group?.sendMessage("""
+                                    ${fromNick}[${fromId}]尝试进群
+                                    EAID:${id}(有效ID),管理员请核对
+                                    LifeKD:${stats.killDeath} 
+                                    LifeKPM:${stats.killsPerMinute}
+                                """.trimIndent())
+                                    this.group
+                                }else{
+                                    this.group?.sendMessage("""
+                                    ${fromNick}[${fromId}]尝试进群,EAID:${id}(无效ID),管理员请核对
+                                """.trimIndent())
+                                }
+                            }
                         }
                     }
                 }

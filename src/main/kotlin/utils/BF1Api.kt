@@ -778,6 +778,27 @@ object BF1Api {
         )
         return postApi(body, sessionId,isLog)
     }
+    //获取当前游玩
+    fun getCuPlayByEA(eaid: String?=null,pid: Long?=null,sessionId: String,isLog: Boolean = true): PostResponse {
+        val personaId: Long = if(eaid.isNullOrEmpty()){
+            if (pid == null) return PostResponse(isSuccessful = false)
+            pid
+        }else{
+            val _pid = getApi("https://api.bfeac.com/utils/search/$eaid", isLog)
+            if (!_pid.isSuccessful) return _pid
+            Gson().fromJson(_pid.reqBody,PlayerPID::class.java).data.personaId
+        }
+        val method = "GameServer.getServersByPersonaIds"
+        val body = Gson().toJson(
+            jsonrpc(
+                method = method,
+                params = object {
+                    val personaIds = listOf(personaId)
+                }
+            )
+        )
+        return postApi(body, sessionId,isLog)
+    }
 
     //获取生涯数据
     fun getStatsByPID(personaId: String,sessionId: String,isLog: Boolean = true): PostResponse {

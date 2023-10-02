@@ -1,6 +1,9 @@
 package top.ffshaozi.utils
 
+import com.google.gson.Gson
 import top.ffshaozi.config.CustomerCmd
+import top.ffshaozi.data.ea.CurPlay
+import top.ffshaozi.utils.BF1Api.getCuPlayByEA
 
 
 /**
@@ -19,6 +22,7 @@ fun test() {
 /*    if (listOf("!", "！").any{"!c".indexOf(it) == 0}){
         println("!c".substring(1))
     }*/
+    //println("15.15%".replace("%","").toFloat())
 }
 
 

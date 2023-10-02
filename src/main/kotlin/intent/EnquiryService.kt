@@ -1,10 +1,13 @@
 package top.ffshaozi.intent
 
+import com.google.gson.Gson
 import kotlinx.coroutines.*
 import net.mamoe.mirai.contact.Contact.Companion.uploadImage
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.*
+import top.ffshaozi.NeriQQBot
 import top.ffshaozi.config.*
+import top.ffshaozi.data.ea.CurPlay
 import top.ffshaozi.utils.*
 import java.io.File
 import java.text.SimpleDateFormat
@@ -243,13 +246,40 @@ object EnquiryService {
             res = res.replace("-DeacState", eacState)
             val recentlyJson = BF1Api.recentlySearch(name)
             if (recentlyJson.isNotEmpty()) {
-                res = res
-                    .replace("-Dre_time", recentlyJson[0].rp)
-                    .replace("-Dre_pt", recentlyJson[0].tp)
-                    .replace("-Dre_spm", recentlyJson[0].spm)
-                    .replace("-Dre_kpm", recentlyJson[0].kpm)
-                    .replace("-Dre_kd", recentlyJson[0].kd)
+                if (recentlyJson[0].rp == "0" || recentlyJson[0].rp == "-1"){
+                    var ssid = ""
+                    run c@{
+                        ServerInfos.serverInfo.forEach {
+                            if (it.sessionId != null){
+                                ssid = it.sessionId!!
+                                return@c
+                            }
+                        }
+                    }
+                    val CuPlay = BF1Api.getCuPlayByEA(pid = allStats.id, sessionId = ssid).reqBody
+                    Gson().fromJson(CuPlay, CurPlay::class.java).result.firstNotNullOfOrNull {
+                        if (it.value?.name != null) {
+                            res = res
+                                .replace("最近KPM:-Dre_kpm 最近KD:-Dre_kd 游玩时间:-Dre_pt","當前遊玩 ${it.value!!.name.substring(0, 36)}...")
+                        }else{
+                            res = res
+                                .replace("-Dre_time", recentlyJson[0].rp)
+                                .replace("-Dre_pt", recentlyJson[0].tp)
+                                .replace("-Dre_spm", recentlyJson[0].spm)
+                                .replace("-Dre_kpm", recentlyJson[0].kpm)
+                                .replace("-Dre_kd", recentlyJson[0].kd)
+                        }
+                    }
+                }else{
+                    res = res
+                        .replace("-Dre_time", recentlyJson[0].rp)
+                        .replace("-Dre_pt", recentlyJson[0].tp)
+                        .replace("-Dre_spm", recentlyJson[0].spm)
+                        .replace("-Dre_kpm", recentlyJson[0].kpm)
+                        .replace("-Dre_kd", recentlyJson[0].kd)
+                }
             }
+
             htmlToImage.writeTempFile(res)
             htmlToImage.toImage(1280, 720)
             return I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
@@ -363,6 +393,8 @@ object EnquiryService {
                 .replace("-DBEST", "${allStats.bestClass}")
                 .replace("-DLKD", "${allStats.killDeath}")
                 .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace("-DACCF", "${allStats.accuracy}")
+                .replace("-DHSF", "${allStats.headshots}")
                 .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
                 .replace("assets/MP_London.jpg", backImg)
                 .replace(
@@ -479,6 +511,8 @@ object EnquiryService {
                 .replace("-DBEST", "${allStats.bestClass}")
                 .replace("-DLKD", "${allStats.killDeath}")
                 .replace("-DLKPM", "${allStats.killsPerMinute}")
+                .replace("-DACCF", "${allStats.accuracy}")
+                .replace("-DHSF", "${allStats.headshots}")
                 .replace("-DGENTIME", SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis()))
                 .replace("assets/MP_Volga.jpg", backImg)
                 .replace(
@@ -628,24 +662,18 @@ object EnquiryService {
      * @return Message
      */
     fun searchServerList(I: PullIntent): Message {
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*pl <ServerCount>").toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!pl <ServerCount>").toPlainText()//参数不足
         val name = I.sp[1]
         var msg: Message = PlainText(CustomerLang.searchErr.replace("//action//", "玩家列表"))
-        val team1 = ForwardMessageBuilder(I.event.group)
-        team1.add(I.event.bot, PlainText("队伍1"))
-        val team2 = ForwardMessageBuilder(I.event.group)
-        team2.add(I.event.bot, PlainText("队伍2"))
-        val blackTeam = ForwardMessageBuilder(I.event.group)
-        blackTeam.add(I.event.bot, PlainText("黑队查询"))
         val gameid = ServerInfos.getGameIDByName(I.event.group.id, name)
         if (gameid.isEmpty()) return msg
-        var groupPlayer = 0
-        var opPlayer = 0
-        var blackPlayer = 0
-        var loadingBots = 0
-        var teamOne = ""
-        var teamOneName = ""
-        var team1Index = 0
+        var groupPlayer = 0//群友
+        var opPlayer = 0//管理
+        var blackPlayer = 0//黑队
+        //var loadingBots = 0//加载中的bot
+        var teamOne = ""//队伍1的替换
+        var teamOneName = ""//队伍1名字
+        var team1Index = 0//队伍1的序号
         var teamTwo = ""
         var teamTwoName = ""
         var team2Index = 0
@@ -669,141 +697,149 @@ object EnquiryService {
         """.trimIndent()
         val platoonSet: MutableSet<String> = mutableSetOf()
         val blackPlayerSet: HashMap<String, MutableList<String>> = hashMapOf()
+        var btrErrSize = 0
         Cache.PlayerListInfo.forEach { players ->
             if (gameid == players.gameID) {
+                if (players.rkp == 0F && players.rkp == 0F) btrErrSize++
                 players.platoonTagList.forEach {
                     platoonSet.add(it)
                 }
-            }
-        }
-        Cache.PlayerListInfo.forEach { players ->
-            platoonSet.forEach {
-                players.platoonTagList.forEach { p ->
-                    if (it == p) {
-                        if (blackPlayerSet[p].isNullOrEmpty()) {
-                            blackPlayerSet[p] = mutableListOf()
-                            blackPlayerSet[p]!!.add(players.id)
-                        } else {
-                            if (!blackPlayerSet[p]!!.any { it == players.id }) {
+                platoonSet.forEach {
+                    players.platoonTagList.forEach { p ->
+                        if (it == p) {
+                            if (blackPlayerSet[p].isNullOrEmpty()) {
+                                blackPlayerSet[p] = mutableListOf()
                                 blackPlayerSet[p]!!.add(players.id)
+                            } else {
+                                if (!blackPlayerSet[p]!!.any { it == players.id }) {
+                                    blackPlayerSet[p]!!.add(players.id)
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        Cache.PlayerListInfo.sortedByDescending { it.join_time }.reversed().forEach {
-            if (gameid != it.gameID) return@forEach
-            var pa = ""
-            if (it.platoon.isNotEmpty())
-                pa = "[ ${it.platoon} ] "
+        val isBtrErr = btrErrSize > 15
 
-            var color = "#fff"
-            var blackText = ""
-            var colorlkd = "#fff"
-            var colorlkp = "#fff"
-            var colorrkp = "#fff"
-            var colorrkd = "#fff"
-            if (it.lkd > it.lifeMaxKD * 0.6) colorlkd = "#ff0"
-            if (it.lkp > it.lifeMaxKPM * 0.6) colorlkp = "#ff0"
-            if (it.rkp > it.recentlyMaxKPM * 0.6) colorrkp = "#ff0"
-            if (it.rkd > it.recentlyMaxKD * 0.6) colorrkd = "#ff0"
-            if (it.lkd > it.lifeMaxKD * 0.8) colorlkd = "#ff6600"
-            if (it.lkp > it.lifeMaxKPM * 0.8) colorlkp = "#ff6600"
-            if (it.rkp > it.recentlyMaxKPM * 0.8) colorrkp = "#ff6600"
-            if (it.rkd > it.recentlyMaxKD * 0.8) colorrkd = "#ff6600"
-            if (it.isBot) {
-                color = "aqua"
-                if (it.botState == "Loading") loadingBots++
-            }
-            if (!it.isBot) {
-                blackPlayerSet.forEach { (p, data) ->
-                    if (data.size > 1) {
-                        data.forEach { id ->
-                            if (id == it.id) {
-                                blackText = "[!]"
-                                blackPlayer++
+        Cache.PlayerListInfo.sortedByDescending { it.join_time }.reversed().forEach {
+            if (gameid == it.gameID) {
+                var pa = ""
+                if (it.platoon.isNotEmpty()) pa = "[${it.platoon}]"
+                //颜色初始值
+                var color = "#fff"
+                var blackText = ""
+                var colorlkd = "#fff"
+                var colorlkp = "#fff"
+                var colorrkp = "#fff"
+                var colorrkd = "#fff"
+                //颜色变更
+                if (it.lkd > it.lifeMaxKD * 0.6) colorlkd = "#ff0"
+                if (it.lkp > it.lifeMaxKPM * 0.6) colorlkp = "#ff0"
+                if (it.lkd > it.lifeMaxKD * 0.8) colorlkd = "#ff6600"
+                if (it.lkp > it.lifeMaxKPM * 0.8) colorlkp = "#ff6600"
+                if (isBtrErr){//btr数据有至少15个无数据时将rkp,rkd替换成hs,acc
+                    if (it.acc.replace("%","").toFloat() > 20.0F) colorrkp = "#ff0"
+                    if (it.hs.replace("%","").toFloat() > 20.0F) colorrkd = "#ff0"
+                    if (it.acc.replace("%","").toFloat() > 50.0F) colorrkp = "#ff6600"
+                    if (it.hs.replace("%","").toFloat() > 50.0F) colorrkd = "#ff6600"
+                }else{
+                    if (it.rkp > it.recentlyMaxKPM * 0.6) colorrkp = "#ff0"
+                    if (it.rkd > it.recentlyMaxKD * 0.6) colorrkd = "#ff0"
+                    if (it.rkp > it.recentlyMaxKPM * 0.8) colorrkp = "#ff6600"
+                    if (it.rkd > it.recentlyMaxKD * 0.8) colorrkd = "#ff6600"
+                }
+                if (it.isBot) {
+                    color = "aqua"
+                }else{
+                    blackPlayerSet.forEach { (p, data) ->
+                        if (data.size > 1) {
+                            data.forEach { id ->
+                                if (id == it.id) {
+                                    blackText = "[!]"
+                                    blackPlayer++
+                                }
                             }
                         }
                     }
-                }
-            }
-            Bindings.bindingData.forEach { p ->
-                if (p.value == it.id) {
-                    color = "pink"
-                    groupPlayer++
-                }
-            }
-            run o@{
-                val sp = Cache.ServerInfoList[gameid]!!.opPlayers.split(";")
-                sp.forEach { sp ->
-                    if (it.pid == sp.toLong()) {
-                        color = "#f9767b"
-                        opPlayer++
-                        return@o
+                    Bindings.bindingData.forEach { p ->
+                        if (p.value == it.id) {
+                            color = "pink"
+                            groupPlayer++
+                        }
                     }
                 }
-            }
-            if (it.teamId == 0) {
-                teamOneName = it.team
-                team1Index++
-                teamOne += player
-                    .replace("NAME", "$pa${it.id}")
-                    .replace("RANK", it.rank.toString())
-                    .replace("INDEX", team1Index.toString())
-                    .replace(
-                        "TIME",
-                        "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
-                    )
-                    .replace("PING", "${it.latency}")
-                    .replace("LANG",
-                        it.langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
-                    )
-                    .replace("LIFE_KD", "${it.lkd}")
-                    .replace("LIFE_KPM", "${it.lkp}")
-                    .replace("R_KD", "${it.rkd}")
-                    .replace("R_KPM", "${it.rkp}")
-                    .replace("BLACK_TEXT", blackText)
-                    .replace("color: #fff;id", "color: ${color};")
-                    .replace("color: #fff;lkd", "color: ${colorlkd};")
-                    .replace("color: #fff;lkp", "color: ${colorlkp};")
-                    .replace("color: #fff;rkp", "color: ${colorrkp};")
-                    .replace("color: #fff;rkd", "color: ${colorrkd};")
-                    .replace(
-                        "rankback",
-                        if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
-                    )
-            } else if (it.teamId == 1) {
-                teamTwoName = it.team
-                team2Index++
-                teamTwo += player
-                    .replace("NAME", "$pa${it.id}")
-                    .replace("RANK", it.rank.toString())
-                    .replace("INDEX", team2Index.toString())
-                    .replace(
-                        "TIME",
-                        "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
-                    )
-                    .replace("PING", "${it.latency}")
-                    .replace("LANG",
-                        it.langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
-                    )
-                    .replace("LIFE_KD", "${it.lkd}")
-                    .replace("LIFE_KPM", "${it.lkp}")
-                    .replace("R_KD", "${it.rkd}")
-                    .replace("R_KPM", "${it.rkp}")
-                    .replace("BLACK_TEXT", blackText)
-                    .replace("color: #fff;id", "color: ${color};")
-                    .replace("color: #fff;lkd", "color: ${colorlkd};")
-                    .replace("color: #fff;lkp", "color: ${colorlkp};")
-                    .replace("color: #fff;rkp", "color: ${colorrkp};")
-                    .replace("color: #fff;rkd", "color: ${colorrkd};")
-                    .replace(
-                        "rankback",
-                        if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
-                    )
-            } else {
+                run o@{
+                    val sp = Cache.ServerInfoList[gameid]!!.opPlayers.split(";")
+                    sp.forEach { sp ->
+                        if (it.pid == sp.toLong()) {
+                            color = "#f9767b"
+                            opPlayer++
+                            return@o
+                        }
+                    }
+                }
+                if (it.teamId == 0) {
+                    teamOneName = it.team
+                    team1Index++
+                    teamOne += player
+                        .replace("NAME", "$pa${it.id}")
+                        .replace("RANK", it.rank.toString())
+                        .replace("INDEX", team1Index.toString())
+                        .replace(
+                            "TIME",
+                            "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
+                        )
+                        .replace("PING", "${it.latency}")
+                        .replace("LANG",
+                            it.langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
+                        )
+                        .replace("LIFE_KD", "${it.lkd}")
+                        .replace("LIFE_KPM", "${it.lkp}")
+                        .replace("R_KD", if(isBtrErr) it.hs else "${it.rkd}")
+                        .replace("R_KPM", if(isBtrErr) it.acc else "${it.rkp}")
+                        .replace("BLACK_TEXT", blackText)
+                        .replace("color: #fff;id", "color: ${color};")
+                        .replace("color: #fff;lkd", "color: ${colorlkd};")
+                        .replace("color: #fff;lkp", "color: ${colorlkp};")
+                        .replace("color: #fff;rkp", "color: ${colorrkp};")
+                        .replace("color: #fff;rkd", "color: ${colorrkd};")
+                        .replace(
+                            "rankback",
+                            if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
+                        )
+                } else if (it.teamId == 1) {
+                    teamTwoName = it.team
+                    team2Index++
+                    teamTwo += player
+                        .replace("NAME", "$pa${it.id}")
+                        .replace("RANK", it.rank.toString())
+                        .replace("INDEX", team2Index.toString())
+                        .replace(
+                            "TIME",
+                            "${(System.currentTimeMillis() - (it.join_time / 1000)) / 1000 / 60}"
+                        )
+                        .replace("PING", "${it.latency}")
+                        .replace("LANG",
+                            it.langLong.toString(16).chunked(2).map { it.toInt(16).toByte() }.toByteArray().toString(Charsets.US_ASCII)
+                        )
+                        .replace("LIFE_KD", "${it.lkd}")
+                        .replace("LIFE_KPM", "${it.lkp}")
+                        .replace("R_KD", if(isBtrErr) it.hs else "${it.rkd}")
+                        .replace("R_KPM", if(isBtrErr) it.acc else "${it.rkp}")
+                        .replace("BLACK_TEXT", blackText)
+                        .replace("color: #fff;id", "color: ${color};")
+                        .replace("color: #fff;lkd", "color: ${colorlkd};")
+                        .replace("color: #fff;lkp", "color: ${colorlkp};")
+                        .replace("color: #fff;rkp", "color: ${colorrkp};")
+                        .replace("color: #fff;rkd", "color: ${colorrkd};")
+                        .replace(
+                            "rankback",
+                            if (it.rank > 120) "background-color: rgb(86, 196, 73);" else ""
+                        )
+                } else {
 
+                }
             }
         }
         var mapName = Cache.ServerInfoList[gameid]!!.map
@@ -829,7 +865,7 @@ object EnquiryService {
             } else {
                 ""
             }
-        val res = text
+        var res = text
             .replace("Team1Replace", teamOne)
             .replace("Team2Replace", teamTwo)
             .replace("-DPREFIX", Cache.ServerInfoList[gameid]!!.perfix)
@@ -853,8 +889,7 @@ object EnquiryService {
             .replace("-DTEAM2NAME", teamTwoName)
             .replace("-DP", Cache.ServerInfoList[gameid]!!.players.toString())
             .replace("-DGameID", gameid)
-            .replace("-DGameID", gameid)
-
+        if (isBtrErr) res = res.replace("最近KP","準確率").replace("最近KD","爆頭率")
         htmlToImage.writeTempFile(res)
         htmlToImage.toImage()
         runBlocking {
