@@ -22,7 +22,7 @@ object ServerManagement {
     //TODO 踢人实现
     fun kickPlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*k <ID> <Reason>").toPlainText()
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "!k <ID> <Reason>").toPlainText()
         var res = ""
         val kickR = when (I.sp[2]) {
             "*tj" -> "禁止偷家"
@@ -41,7 +41,7 @@ object ServerManagement {
             var temp = "找到多个ID,无法确认\n"
             Cache.PlayerListInfo.forEach { pldata ->
                 if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
-                    temp += "ID:${pldata.id} 在 队伍${pldata.team}\n"
+                    temp += "ID:${pldata.id} 在 ${pldata.team}\n"
                 }
             }
             res += temp
@@ -69,7 +69,7 @@ object ServerManagement {
     //TODO ban人实现
     fun banPlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*b <ServerCount> <ID>").toPlainText()
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "!b <ServerName> <ID>").toPlainText()
         val name = I.sp[1]
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val serverBan = BF1Api.addServerBan(server.sessionId!!, server.serverRspID, I.sp[2])
@@ -83,7 +83,7 @@ object ServerManagement {
     //TODO unban人实现
     fun unBanPlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "*rb <ServerCount> <ID>").toPlainText()
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "!rb <ServerName> <ID>").toPlainText()
         val name = I.sp[1]
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val pid = BF1Api.getPersonaid(I.sp[2])
@@ -96,9 +96,27 @@ object ServerManagement {
         }
     }
 
+    fun addVban(I: PullIntent):Message{
+        if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "!vb <ServerName> <ID>").toPlainText()
+        val name = I.sp[1]
+        val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        server.vBanList.add(I.sp[2])
+        return CustomerLang.banSucc.replace("//id//", I.sp[2]).replace("//serverCount//", name).toPlainText()
+    }
+
+    fun unVban(I: PullIntent):Message{
+        if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
+        if (I.cmdSize < 3) return CustomerLang.parameterErr.replace("//para//", "!rvb <ServerName> <ID>").toPlainText()
+        val name = I.sp[1]
+        val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        server.vBanList.remove(I.sp[2])
+        return CustomerLang.banSucc.replace("//id//", I.sp[2]).replace("//serverCount//", name).toPlainText()
+    }
+
     //TODO 查询服务器Ban实现
     fun getBanList(I: PullIntent, re: Boolean = false): Message {
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*gb <ServerCount>").toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!gb <ServerName>").toPlainText()
         val name = I.sp[1]
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val it: FullServerInfoJson = BF1Api.getFullServerDetails(server.sessionId.toString(), server.gameID.toString())
@@ -116,12 +134,12 @@ object ServerManagement {
     //TODO 添加VIP实现
     fun addVipPlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*av <ServerCount> <ID> <Time>").toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!av <ServerName> <ID> <Time>").toPlainText()
         val name = I.sp[1]
         val time = try {
             I.sp[3].toFloat()
         }catch (e:Exception){
-            return CustomerLang.parameterErr.replace("//para//", "*av <ServerCount> <ID> <Time>").toPlainText()
+            return CustomerLang.parameterErr.replace("//para//", "!av <ServerName> <ID> <Time>").toPlainText()
         }
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val serverVIP = BF1Api.addServerVIP(server.sessionId.toString(), server.serverRspID, I.sp[2])
@@ -149,7 +167,7 @@ object ServerManagement {
     //TODO 移除VIP人实现
     fun unVipPlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*rv <ServerCount> <ID>").toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!rv <ServerName> <ID>").toPlainText()
         val name = I.sp[1]
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val pid = BF1Api.getPersonaid(I.sp[2])
@@ -165,7 +183,7 @@ object ServerManagement {
     //TODO 切图实现
     fun chooseLevel(I: PullIntent, re: Boolean = false): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*qt <ServerCount> <level>").toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!qt <ServerName> <level>").toPlainText()
         val name = I.sp[1]
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         val serverInfoJson = BF1Api.getFullServerDetails(server.sessionId!!, server.gameID!!)
@@ -199,7 +217,7 @@ object ServerManagement {
     //TODO 换边实现
     fun movePlayer(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*hb <ID>")
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!hb <ID>")
             .toPlainText()
         var player = 0
         Cache.PlayerListInfo.forEach { pldata ->
@@ -211,7 +229,7 @@ object ServerManagement {
             var temp = "找到多个ID,无法确认\n"
             Cache.PlayerListInfo.forEach { pldata ->
                 if (pldata.id.indexOf(I.sp[1], 0, true) != -1) {
-                    temp += "ID:${pldata.id} 在 队伍${pldata.team}\n"
+                    temp += "ID:${pldata.id} 在 ${pldata.team}\n"
                 }
             }
             return temp.toPlainText()
@@ -235,7 +253,7 @@ object ServerManagement {
     //TODO 查询VIP实现
     fun getVipList(I: PullIntent): Message {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
-        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "*gv <ServerCount>").toPlainText()
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!gv <ServerName>").toPlainText()
         val name = I.sp[1]
         val server = ServerInfos.getServerByName(I.event.group.id,name) ?: return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
         var temp = "服务器$name 的vip列表如下\n"
@@ -254,7 +272,7 @@ object ServerManagement {
         if (!I.isAdmin) return CustomerLang.notAdminErr.toPlainText()
         if (I.cmdSize < 4) return CustomerLang.parameterErr.replace(
             "//para//",
-            "*setkd <ServerCount> <lkd/lkp/rkd/rkp> <Float>"
+            "!setkd <ServerName> <lkd/lkp/rkd/rkp> <Float>"
         )
             .toPlainText()
         val name = I.sp[1]
@@ -266,7 +284,7 @@ object ServerManagement {
             "rkd" -> ServerInfos.setKD(server.gameID?:"", recentlyMaxKD = I.sp[3].toFloat())
             else -> return CustomerLang.parameterErr.replace(
                 "//para//",
-                "*setkd <ServerCount> <lkd/lkp/rkd/rkp> <Float>"
+                "!setkd <ServerName> <lkd/lkp/rkd/rkp> <Float>"
             )
                 .toPlainText()
         }
@@ -284,5 +302,6 @@ object ServerManagement {
             "移除白名单成功".toPlainText()
         }
     }
+
 
 }

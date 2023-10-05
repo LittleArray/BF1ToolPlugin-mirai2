@@ -29,7 +29,7 @@ object NeriQQBot : KotlinPlugin(
     JvmPluginDescription(
         id = "top.ffshaozi.NeriQQBot",
         name = "NeriQQBot",
-        version = "1.0.4",
+        version = "1.0.5",
     ) {
         author("FFSHAOZI")
         info("""Neri家的战地1QQ机器人""")
@@ -81,7 +81,7 @@ object NeriQQBot : KotlinPlugin(
                 Glogger.info("重注册${bot.id}群会话事件响应 ")
                 bot.eventChannel.subscribeGroupMessages {
                     GroupSetting.groupSetting.forEach {
-                        sentFrom(it.groupID ?:0L) quoteReply  { s ->
+                        sentFrom(it.groupID ?: 0L) quoteReply { s ->
                             var isAdmin = false
                             this.group.members.forEach {
                                 if (it.permission.level != 0 && it.id == this.sender.id) isAdmin = true
@@ -94,37 +94,53 @@ object NeriQQBot : KotlinPlugin(
                     }
                 }
                 Glogger.info("重注册${bot.id}入群判断事件响应 ")
-                bot.eventChannel.subscribeAlways<MemberJoinRequestEvent>{
-                    GroupSetting.groupSetting.forEach {p->
+                bot.eventChannel.subscribeAlways<MemberJoinRequestEvent> {
+                    GroupSetting.groupSetting.forEach { p ->
                         if (it.group?.id == p.groupID) {
-                            val id = message.replace("\n","").replace("问题：EAID","").replace("答案：","")
+                            val id = message.replace("\n", "").replace("问题：EAID", "").replace("答案：", "")
                             Glogger.info("${fromId}请求入群:${groupId},入群消息:${id}")
+
                             run p@{
-                                BotLog.reEnterServerLog.forEach { (time, data) ->
-                                    val sp = data.split(" ")
-                                    if (sp[0] == id){
-                                        this.group?.sendMessage("""
+                                if (BF1Api.searchBFEAC(id).data?.first()?.current_status == 1) {
+                                    this.group?.sendMessage("挂钩:$id 尝试进群,已拒绝并拉入黑名单")
+                                    reject(true)
+                                    return@p
+                                }
+                                ServerInfos.serverInfo.forEach {
+                                    if (it.riskBanList.any { it == id }) {
+                                        this.group?.sendMessage(
+                                            """
                                         ${fromNick}[${fromId}]由于风控进群
                                         EAID:${id}(有效ID),自动通过
-                                        风控服务器为${sp[1]}
-                                    """.trimIndent())
+                                    """.trimIndent()
+                                        )
                                         accept()
                                         return@p
                                     }
                                 }
                                 val stats = BF1Api.getStats(id)
-                                if (stats.rank != 0 || stats.currentRankProgress != 0L){
-                                    this.group?.sendMessage("""
+                                if (stats.rank != 0 || stats.currentRankProgress != 0L) {
+                                    this.group?.sendMessage(
+                                        """
                                     ${fromNick}[${fromId}]尝试进群
                                     EAID:${id}(有效ID),管理员请核对
-                                    LifeKD:${stats.killDeath} 
-                                    LifeKPM:${stats.killsPerMinute}
-                                """.trimIndent())
-                                    this.group
-                                }else{
-                                    this.group?.sendMessage("""
+                                    ${
+                                            when (stats.killDeath) {
+                                                in 0.0..1.0 -> "鉴定为大薯"
+                                                in 1.0..2.0 -> "鉴定为中薯"
+                                                in 2.0..3.0 -> "鉴定为噗肉哥"
+                                                in 3.0..4.0 -> "鉴定为超级噗肉哥"
+                                                else -> { "我超瓜!!!" }
+                                            }
+                                        }
+                                    """.trimIndent()
+                                    )
+                                } else {
+                                    this.group?.sendMessage(
+                                        """
                                     ${fromNick}[${fromId}]尝试进群,EAID:${id}(无效ID),管理员请核对
-                                """.trimIndent())
+                                    """.trimIndent()
+                                    )
                                 }
                             }
                         }

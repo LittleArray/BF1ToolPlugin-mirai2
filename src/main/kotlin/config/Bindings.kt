@@ -3,7 +3,6 @@ package top.ffshaozi.config
 import net.mamoe.mirai.console.data.AutoSavePluginData
 import net.mamoe.mirai.console.data.ValueDescription
 import net.mamoe.mirai.console.data.value
-
 /**
  * @Description 全局可用的绑定数据
  * @Author littleArray
@@ -33,7 +32,12 @@ object Bindings : AutoSavePluginData("Bindings"){
             true
         }
     }
-    fun addBinding(groupID: Long, qq: Long, EAid: String) = bindingData.put(qq, EAid)
+    fun addBinding(groupID: Long, qq: Long, EAid: String) {
+        bindingData.put(qq, EAid)
+        ServerInfos.serverInfo.forEach {
+            it.riskBanList.remove(EAid)
+        }
+    }
     fun removeBinding(groupID: Long, qq: Long): String? = bindingData.remove(qq)
     fun getBinding(groupID: Long, qq: Long): String {
         var idTemp = ""
@@ -43,3 +47,4 @@ object Bindings : AutoSavePluginData("Bindings"){
         return idTemp
     }
 }
+

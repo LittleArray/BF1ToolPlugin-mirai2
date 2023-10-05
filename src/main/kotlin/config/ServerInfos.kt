@@ -241,11 +241,13 @@ data class _ServerInfo(
     var isEnableAutoKick: Boolean = true,
     var isEnableReEnterKick: Boolean = true,
     var isEnableSpKick: Boolean = true,
-    var ReEnterKickMsg: String = "伺服器禁止短時間內重進",
+    var ReEnterKickMsg: String = "風控:禁止重進",
     var recentlyMaxKD: Float = 2.0F,
     var recentlyMaxKPM: Float = 1.5F,
     var lifeMaxKD: Float = 1.5F,
     var lifeMaxKPM: Float = 1.5F,
     var platoonLimited: MutableList<String> = mutableListOf(),
-    var vipList: MutableMap<String, Float> = mutableMapOf()
+    var vipList: MutableMap<String, Float> = mutableMapOf(),
+    val vBanList: MutableSet<String> = mutableSetOf(),
+    val riskBanList: MutableSet<String> = mutableSetOf(),
 )

@@ -132,7 +132,9 @@ object Cache {
         管理指令
         !k <Id> <理由(繁体或英文)> -踢人 快速理由:*zz 禁止蜘蛛人 *tj 禁止偷家 *nf 暖服战神 *ur 违反规则
         !b <SerName> <Id> -Ban人
+        !vb <SerName> <Id> -Ban人
         !rb <SerName> <Id> -取消ban
+        !rvb <SerName> <Id> -取消ban
         !av <SerName> <Id> <Time?> -添加vip 时间单位为天,允许小数
         !rv <SerName> <Id> -移除vip
         !gv <SerName> -获取群内vip玩家列表
@@ -202,7 +204,7 @@ object Cache {
         /**
          * 当以下数据被改变是将触发自动踢人流程
          */
-        var join_time: Long = System.currentTimeMillis()
+        var join_time: Long = System.currentTimeMillis() * 1000
             set(value) {
                 val old = field
                 field = value
@@ -461,6 +463,12 @@ object Cache {
                     isEnableReEnterKick = it.isEnableReEnterKick
                     if (isEnableReEnterKick) {
                         reEnterKickMsg = it.ReEnterKickMsg
+                        Bindings.bindingData.forEach { (qq, id) ->
+                            if (id == player.id) {
+                                isEnableReEnterKick = false
+                                reEnterKickMsg = ""
+                            }
+                        }
                     }
                 }
             }
@@ -561,43 +569,71 @@ object Cache {
          */
         private fun ifReEnter() {
             if (!isBot) {
+                player.lkd = 0f
+                player.lkp = 0f
+                player.rkd = 0f
+                player.rkp = 0f
                 BotLog.exitServerLog.forEach { (time, data) ->
-                    val exitTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").parse(time)
-                    val cd = 10 * 60 * 1000
-                    if (join_time / 1000 - exitTime.time < cd) {
-                        val sp = data.split(" ")
-                        if (sp[0] == player.id && sp[1] == player.gameID) {
-                            BotLog.enterServerLog(Date(join_time / 1000), id, gameID)
-                            BotLog.reEnterServerLog(Date(player.join_time / 1000), player.id, player.gameID)
-                            Bindings.bindingData.forEach { (qq, id) ->
-                                if (id == player.id) {
-                                    isEnableReEnterKick = false
-                                }
-                            }
-                            if (isEnableReEnterKick) {
-                                if (!isKicking) {
-                                    isKicking = true
-                                    coroutineScope.launch {
-                                        val kick = player.kick(reEnterKickMsg)
-                                        if (!kick.isSuccessful) {
-                                            messageCD++
-                                            if (messageCD % 2 == 0) {
-                                                sendMessage(
-                                                    player.gameID,
-                                                    "玩家${player.id}在//SC//服短时间内重进没被踹出去"
-                                                )
-                                            }
-                                        }
-                                        isKicking = false
-                                    }
-                                }
-                            }
-                        }
+                    val sp = data.split(" ")
+                    if (sp[0] == player.id && sp[1] == player.gameID) {
+                        BotLog.enterServerLog(Date(join_time / 1000), id, gameID)
+                        BotLog.reEnterServerLog(Date(player.join_time / 1000), player.id, player.gameID)
+                        reEnterKick()
                     }
                 }
             }
         }
 
+        /**
+         * 重进踢出
+         */
+        fun reEnterKick(){
+            if (isEnableReEnterKick) {
+                //加入重进风控名单
+                ServerInfos.serverInfo.forEach {
+                    if (it.gameID == player.gameID)
+                        it.riskBanList.add(player.id)
+                }
+                if (!isKicking) {
+                    isKicking = true
+                    coroutineScope.launch {
+                        val kick = player.kick(reEnterKickMsg)
+                        if (!kick.isSuccessful) {
+                            messageCD++
+                            if (messageCD % 2 == 0) {
+                                sendMessage(
+                                    player.gameID,
+                                    "玩家${player.id}在//SC//服短时间内重进没被踹出去"
+                                )
+                            }
+                        }
+                        isKicking = false
+                    }
+                }
+            }
+        }
+
+        /**
+         * vBan
+         */
+        fun vBan(){
+            if (!isKicking) {
+                isKicking = true
+                coroutineScope.launch {
+                    val kick = player.kick("VBan")
+                    if (!kick.isSuccessful) {
+                        messageCD++
+                        if (messageCD % 2 == 0) {
+                            sendMessage(
+                                player.gameID,
+                                "玩家${player.id}在//SC//服的VBan失效"
+                            )
+                        }
+                    }
+                    isKicking = false
+                }
+            }
+        }
         /**
          * 善后工作
          */
@@ -908,8 +944,7 @@ object Cache {
                         }
                     }
                 }
-                //BFEAC检测
-                //Glogger.info("BFEAC批量检查")
+                //BFEAC批量检查
                 val cacheBan: MultiCheckResponse
                 val cacheList = MultiCheckPostJson()
                 PlayerListInfo.forEach { data ->
@@ -917,8 +952,9 @@ object Cache {
                 }
                 if (cacheList.pids.size == 0) return@p
                 cacheBan = searchBFEAC(cacheList, false)
-                cacheBan.data.forEach {
-                    PlayerListInfo.forEach { data ->
+                PlayerListInfo.forEach { data ->
+                    //eacBan
+                    cacheBan.data.forEach {
                         if (data.pid == it) {
                             CoroutineScope(Dispatchers.IO).launch {
                                 val kick = data.kick("掛鉤滾 BFEAC BAN")
@@ -931,10 +967,19 @@ object Cache {
                             }
                         }
                     }
-
-
+                    ServerInfos.serverInfo.forEach {
+                        if (it.gameID == data.gameID){
+                            //riskBan
+                            if (it.riskBanList.any{data.id == it}) {
+                                data.reEnterKick()
+                            }
+                            //vBan
+                            if (it.vBanList.any{data.id == it}) {
+                                data.vBan()
+                            }
+                        }
+                    }
                 }
-
             }
         }
         //Glogger.info("玩家整理完毕 现存数量:${PlayerListInfo.size}")

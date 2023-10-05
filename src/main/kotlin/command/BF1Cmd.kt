@@ -89,6 +89,23 @@ object BF1Cmd : CompositeCommand(
         }
     }
 
+
+
+    @SubCommand()
+    @Description("绑定服务器(群内使用)")
+    suspend fun CommandSender.binding(name:String,gameID: String) {
+        ServerInfos.addServer(name, gameID)
+        GroupSetting.addGroupBindingServer(this.subject?.id ?:0, gameID, name)
+    }
+
+    @SubCommand()
+    @Description("移除服务器(群内使用)")
+    suspend fun CommandSender.unBinding(name:String) {
+        val gameID = ServerInfos.getGameIDByName(this.subject?.id ?:0,name)
+        ServerInfos.removeServer(gameID)
+        GroupSetting.removeGroupBindingServer(this.subject?.id ?:0, gameID)
+    }
+
     @SubCommand()
     @Description("设置ssid")
     suspend fun CommandSender.setSSID(gameID: String, ssid: String) {
@@ -101,12 +118,15 @@ object BF1Cmd : CompositeCommand(
 
     @SubCommand()
     @Description("更新服务器")
-    suspend fun CommandSender.updateServer(gameID: String) {
-        if (ServerInfos.updateServer(gameID)) {
-            sendMessage("更新成功")
-        } else {
-            sendMessage("更新失败")
+    suspend fun CommandSender.update() {
+        ServerInfos.serverInfo.forEach {
+            if (ServerInfos.updateServer(it.gameID ?: "")) {
+                sendMessage("更新成功 ${it.gameID}")
+            } else {
+                sendMessage("更新失败 ${it.gameID}")
+            }
         }
+
     }
 
     @SubCommand()
@@ -138,7 +158,8 @@ object BF1Cmd : CompositeCommand(
 
     @SubCommand()
     @Description("获取群组连接服务器")
-    suspend fun CommandSender.getLinkServer(groupId: Long) {
+    suspend fun CommandSender.getLinkServer(groupID:Long?=null) {
+        val groupId = this.subject?.id ?: groupID ?: return
         val games = GroupSetting.getGroupBindingServer(groupId)
         var temp  = "群组$groupId 连接的服务器如下\n"
         games?.forEach {
