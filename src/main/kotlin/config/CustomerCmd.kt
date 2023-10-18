@@ -47,6 +47,8 @@ object CustomerCmd : ReadOnlyPluginConfig("CustomerCmd") {
     val ban by value(listOf("b", "ban"))
     @ValueDescription("v封禁")
     val vBan by value(listOf("vb", "vban"))
+    @ValueDescription("v封禁")
+    val warmProgress by value(listOf("nfp", "查进度"))
     @ValueDescription("切图")
     val chooseMap by value(listOf("qt", "切图"))
     @ValueDescription("换边")

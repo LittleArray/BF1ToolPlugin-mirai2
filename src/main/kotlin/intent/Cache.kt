@@ -125,6 +125,7 @@ object Cache {
         !rec <Id?> -查询最近账号数据
         !pl <SerName> -查询服务器内玩家列表
         !ss <SerName> -查询服务器
+        !nfp <SerName> -查询暖服进度
         背景图请用静态地址,实在不行自己上传到图床,设置null则恢复默认
     """.trimIndent()
 
@@ -679,7 +680,7 @@ object Cache {
                 list.GDAT?.get(0)?.ROST?.forEach { p ->
                     size++
                 }
-                if (size == 0) {
+                /*if (size == 0) {
                     runBlocking c@{
                         //重试3次
                         repeat(2) {
@@ -693,7 +694,7 @@ object Cache {
                             delay(3000)
                         }
                     }
-                }
+                }*/
                 if (!list.isSuccessful) return@p
                 //添加缓存
                 gameIDCache.add(oldGameID)
@@ -777,17 +778,17 @@ object Cache {
                     if (players in 30..47) {//剩余玩家30到47
                         sendMessage(
                             oldGameID,
-                            "快救//SC//服,要寄了 剩余:$players 人"
+                            "快救//SC//服,要寄了"
                         )
                     }
-                    if (players == 0) {
+                    /*if (players == 0) {
                         if ((ServerInfoList[oldGameID]?.players ?: 0) != 1)
                             sendMessage(
                                 oldGameID,
                                 "//SC//服,死完了"
                             )
 
-                    }
+                    }*/
                 }
                 //进人提醒
                 if ((ServerInfoList[oldGameID]?.players ?: 0) < players) {

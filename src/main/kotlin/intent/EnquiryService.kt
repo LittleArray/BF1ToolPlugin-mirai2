@@ -71,11 +71,12 @@ object EnquiryService {
         val name = id
         val allStats = BF1Api.getAllStats(name)
         if (allStats.isSuccessful) {
+            if (I.cmdSize == 1) Bindings.addBinding(I.event.group.id,I.event.sender.id,allStats.userName.toString())
             val backImg = BackgroundImgData.backgroundImgData[I.event.sender.id]?.statsImg ?: "assets/MP_Blitz.jpg"
             val htmlToImage = HtmlToImage()
             val content = htmlToImage.readIt("stats")
             var res = content
-                .replace("-DNAME", name)
+                .replace("-DNAME", allStats.userName.toString())
                 .replace("-DRANK", allStats.rank.toString())
                 .replace("-DCPRO", allStats.currentRankProgress.toString())
                 .replace("-DTPRO", allStats.totalRankProgress.toString())
@@ -99,6 +100,8 @@ object EnquiryService {
                 .replace("-Dskill", "${allStats.skill}")
                 .replace("-Daccuracy", "${allStats.accuracy}")
                 .replace("-Dheadshots", "${allStats.headshots}")
+                .replace("-DheadShots", "${allStats.headShots}")
+                .replace("-DsaviorKills", "${allStats.saviorKills}")
                 .replace("-DkillAssists", "${allStats.killAssists}")
                 .replace("-DhighestKillStreak", "${allStats.highestKillStreak}")
                 .replace("-DlongestHeadShotm", "${allStats.longestHeadShot}")
@@ -444,37 +447,33 @@ object EnquiryService {
                 </span>
             </div>
         """.trimIndent()
-            var line1 = ""
-            var line2 = ""
-            var line3 = ""
-            var line4 = ""
-            var weaponIndex = 0
-            allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEach { weapon ->
-                if (weapon.weaponName.indexOf("三八") != -1) {
-                    weapon.type = "步槍"
-                }
-                if (typeI == weapon.type || typeI == null) {
-                    weaponIndex++
-                    htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
-                    val temp = wpModel
-                        .replace("STATS", if (weapon.kills > 100) "${weapon.kills.div(100)} ★" else "0 ★")
-                        .replace("KILLS", "${weapon.kills}")
-                        .replace("NAME", weapon.weaponName)
-                        .replace("-DKPM", weapon.killsPerMinute.toString())
-                        .replace("-DVP", weapon.hitVKills.toString())
-                        .replace("-DAC", weapon.accuracy)
-                        .replace("-DHS", weapon.headshots)
-                        .replace("-DTP", "${weapon.timeEquipped / 60 / 60}")
-                        .replace("IMG", htmlToImage.getImgPath())
-                    when (weaponIndex) {
-                        in 1..3 -> line1 += temp
-                        in 4..6 -> line2 += temp
-                        in 7..9 -> line3 += temp
-                        in 10..12 -> line4 += temp
+            var wpText = ""
+            run p@{
+                var weaponIndex=0
+                allStats.weapons?.sortedByDescending { weapons -> weapons.kills }?.forEach { weapon ->
+                    if (weapon.weaponName.indexOf("三八") != -1) {
+                        weapon.type = "步槍"
+                    }
+                    if (typeI == weapon.type || typeI == null) {
+                        weaponIndex++
+                        if (weaponIndex > 12) return@p
+                        htmlToImage.cacheImg(weapon.image, "Weapon_${weapon.weaponName}")
+                        val temp = wpModel
+                            .replace("STATS", if (weapon.kills > 100) "${weapon.kills.div(100)} ★" else "0 ★")
+                            .replace("KILLS", "${weapon.kills}")
+                            .replace("NAME", weapon.weaponName)
+                            .replace("-DKPM", weapon.killsPerMinute.toString())
+                            .replace("-DVP", weapon.hitVKills.toString())
+                            .replace("-DAC", weapon.accuracy)
+                            .replace("-DHS", weapon.headshots)
+                            .replace("-DTP", "${weapon.timeEquipped / 60 / 60}")
+                            .replace("IMG", htmlToImage.getImgPath())
+                        wpText +=temp
                     }
                 }
             }
-            res = res.replace("LINE1", line1).replace("LINE2", line2).replace("LINE3", line3).replace("LINE4", line4)
+
+            res = res.replace("WPTEXT", wpText)
             htmlToImage.writeTempFile(res)
             htmlToImage.toImage(1280, 720)
             return I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
@@ -558,31 +557,24 @@ object EnquiryService {
                 <p>时长:-DTPh</p>
             </div>
         """.trimIndent()
-            var line1 = ""
-            var line2 = ""
-            var line3 = ""
-            var line4 = ""
-            var vehiclesIndex = 0
-            allStats.vehicles?.sortedByDescending { vehicles -> vehicles.kills }?.forEach { vehicles ->
-                vehiclesIndex++
-                htmlToImage.cacheImg(vehicles.image, "Vehicles_${vehicles.vehicleName}")
-                val temp = vpModel
-                    .replace("STATS", if (vehicles.kills > 100) "${vehicles.kills.div(100)} ★" else "0 ★")
-                    .replace("KILLS", "${vehicles.kills}")
-                    .replace("NAME", vehicles.vehicleName)
-                    .replace("-DKPM", vehicles.killsPerMinute.toString())
-                    .replace("-DS", vehicles.destroyed.toString())
-                    .replace("-DTP", "${vehicles.timeIn / 60 / 60}")
-                    .replace("IMG", htmlToImage.getImgPath())
-                when (vehiclesIndex) {
-                    in 1..3 -> line1 += temp
-                    in 4..6 -> line2 += temp
-                    in 7..9 -> line3 += temp
-                    in 10..12 -> line4 += temp
-                }
+            var vpText = ""
+            run p@{
+                allStats.vehicles?.sortedByDescending { vehicles -> vehicles.kills }?.forEachIndexed { vehiclesIndex,vehicles ->
+                    if(vehiclesIndex > 11) return@p
+                    htmlToImage.cacheImg(vehicles.image, "Vehicles_${vehicles.vehicleName}")
+                    val temp = vpModel
+                        .replace("STATS", if (vehicles.kills > 100) "${vehicles.kills.div(100)} ★" else "0 ★")
+                        .replace("KILLS", "${vehicles.kills}")
+                        .replace("NAME", vehicles.vehicleName)
+                        .replace("-DKPM", vehicles.killsPerMinute.toString())
+                        .replace("-DS", vehicles.destroyed.toString())
+                        .replace("-DTP", "${vehicles.timeIn / 60 / 60}")
+                        .replace("IMG", htmlToImage.getImgPath())
+                    vpText+=temp
 
+                }
             }
-            res = res.replace("LINE1", line1).replace("LINE2", line2).replace("LINE3", line3).replace("LINE4", line4)
+            res = res.replace("VPTEXT", vpText)
             htmlToImage.writeTempFile(res)
             htmlToImage.toImage(1280, 720)
             return I.event.subject.uploadImage(File(htmlToImage.getFilePath()))
@@ -921,6 +913,35 @@ object EnquiryService {
         }
     }
 
+    /**
+     * 查询暖服进度
+     * @param I PullIntent
+     * @return Message
+     */
+    fun warmProgress(I: PullIntent):Message{
+        if (I.cmdSize < 2) return CustomerLang.parameterErr.replace("//para//", "!nfp <ServerCount>").toPlainText()
+        val name = I.sp[1]
+        val gameID = ServerInfos.getGameIDByName(I.event.group.id, name)
+        if (gameID.isBlank()) return CustomerLang.nullServerErr.replace("//err//", name).toPlainText()
+        var bots = 0
+        var players = 0
+        Cache.PlayerListInfo.forEach {
+            if (gameID == it.gameID){
+                if (it.isBot) bots++ else players++
+            }
+        }
+        var mapName = Cache.ServerInfoList[gameID]!!.map
+        Cache.mapCache.forEach {
+            if (Cache.ServerInfoList[gameID]!!.map == it.key)
+                mapName = it.value
+        }
+        return """
+            服务器${name}的暖服进度:
+            当前地图:${mapName}
+            机器数量:${bots}
+            真实玩家:${players}
+        """.trimIndent().toPlainText()
+    }
     /**
      * 查询黑队
      * @param I PullIntent
